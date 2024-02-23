@@ -26,7 +26,7 @@ static enum xnn_status create_constant_pad_operator(
   size_t num_values,
   struct xnn_operator_data* opdata,
   struct xnn_code_cache* code_cache,
-  struct xnn_weights_cache* weights_cache)
+  xnn_weights_cache_t weights_cache)
 {
   assert(node->num_inputs == 1);
   const uint32_t input_id = node->inputs[0];
@@ -69,13 +69,15 @@ static enum xnn_status create_constant_pad_operator(
 
 static enum xnn_status reshape_constant_pad_operator(
   struct xnn_operator_data* opdata,
-  const struct xnn_value* values,
+  struct xnn_value* values,
   size_t num_values,
   pthreadpool_t threadpool)
 {
+  enum xnn_status status = xnn_status_invalid_state;
+  const size_t old_workspace_size = opdata->workspace_size;
   switch (opdata->operator_objects[0]->type) {
     case xnn_operator_type_constant_pad_nd_x8:
-      return xnn_reshape_constant_pad_nd_x8(
+      status = xnn_reshape_constant_pad_nd_x8(
         opdata->operator_objects[0],
         opdata->shape1.num_dims,
         opdata->shape1.dim,
@@ -84,7 +86,7 @@ static enum xnn_status reshape_constant_pad_operator(
         threadpool);
       break;
     case xnn_operator_type_constant_pad_nd_x16:
-      return xnn_reshape_constant_pad_nd_x16(
+      status = xnn_reshape_constant_pad_nd_x16(
         opdata->operator_objects[0],
         opdata->shape1.num_dims,
         opdata->shape1.dim,
@@ -93,7 +95,7 @@ static enum xnn_status reshape_constant_pad_operator(
         threadpool);
       break;
     case xnn_operator_type_constant_pad_nd_x32:
-      return xnn_reshape_constant_pad_nd_x32(
+      status = xnn_reshape_constant_pad_nd_x32(
         opdata->operator_objects[0],
         opdata->shape1.num_dims,
         opdata->shape1.dim,
@@ -104,6 +106,24 @@ static enum xnn_status reshape_constant_pad_operator(
     default:
       XNN_UNREACHABLE;
   }
+  if (status != xnn_status_success) {
+    return status;
+  }
+  const uint32_t input_id = opdata->inputs[0];
+  assert(input_id < num_values);
+  struct xnn_value* input_value = values + input_id;
+  const uint32_t output_id = opdata->outputs[0];
+  assert(output_id < num_values);
+  struct xnn_value* output_value = values + output_id;
+  for (size_t i = 0; i < input_value->shape.num_dims; ++i) {
+    output_value->shape.dim[i] = input_value->shape.dim[i] + opdata->pre_paddings[i] + opdata->post_paddings[i];
+  }
+  const size_t new_size = xnn_tensor_get_size(output_value);
+  if (new_size > output_value->size || opdata->workspace_size > old_workspace_size) {
+    output_value->size = new_size;
+    return xnn_status_reallocation_required;
+  }
+  return xnn_status_success;
 }
 
 static enum xnn_status setup_constant_pad_operator(

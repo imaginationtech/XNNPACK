@@ -200,6 +200,7 @@ struct xnn_operator {
   size_t valid_batch_size;
   size_t last_input_height;
   size_t last_input_width;
+  size_t last_input_channels;
   const void* last_input;
   size_t last_output_height;
   size_t last_output_width;
@@ -268,6 +269,7 @@ struct xnn_operator {
     union xnn_f32_qs8_cvt_params f32_qs8_cvt;
     union xnn_f32_qu8_cvt_params f32_qu8_cvt;
     union xnn_qs8_cvt_params qs8_cvt;
+    union xnn_qs8_f16_cvt_params qs8_f16_cvt;
     union xnn_qs8_f32_cvt_params qs8_f32_cvt;
     union xnn_qs16_qs8_cvt_params qs16_qs8_cvt;
     union xnn_qu8_cvt_params qu8_cvt;
@@ -367,6 +369,7 @@ struct xnn_operator {
     const struct xnn_x8_lut_config* lut_config;
     const struct xnn_cmul_config* cmul_config;
     const struct xnn_transpose_config* transpose_config;
+    const struct xnn_binary_elementwise_subconfig* binary_elementwise_subconfig;
     struct {
       const struct xnn_unary_elementwise_config* unary_elementwise_config;
       const struct xnn_reduce_config* rminmax_config;  // For dynamic quantization convert operator.
@@ -438,7 +441,7 @@ struct xnn_operator {
   } context;
 
   struct xnn_code_cache* code_cache;
-  struct xnn_weights_cache* weights_cache;
+  xnn_weights_cache_t weights_cache;
   enum xnn_run_state state;
 };
 

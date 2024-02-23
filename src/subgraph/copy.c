@@ -9,6 +9,7 @@
 #include <xnnpack.h>
 #include <xnnpack/log.h>
 #include <xnnpack/operator.h>
+#include <xnnpack/reshape-helpers.h>
 #include <xnnpack/subgraph.h>
 #include <xnnpack/subgraph-validation.h>
 
@@ -18,7 +19,7 @@ static enum xnn_status create_copy_operator(
   size_t num_values,
   struct xnn_operator_data* opdata,
   struct xnn_code_cache* code_cache,
-  struct xnn_weights_cache* weights_cache)
+  xnn_weights_cache_t weights_cache)
 {
   assert(node->num_inputs == 1);
   assert(node->num_outputs == 1);
@@ -27,20 +28,17 @@ static enum xnn_status create_copy_operator(
   switch (node->compute_type) {
     case xnn_compute_type_fp16:
       status = xnn_create_copy_nc_x16(
-        1 /* channels */, 1 /* input stride */, 1 /* output stride */,
         node->flags,
         &opdata->operator_objects[0]);
       break;
     case xnn_compute_type_fp32:
       status = xnn_create_copy_nc_x32(
-        1 /* channels */, 1 /* input stride */, 1 /* output stride */,
         node->flags,
         &opdata->operator_objects[0]);
       break;
     case xnn_compute_type_qs8:
     case xnn_compute_type_qu8:
       status = xnn_create_copy_nc_x8(
-        1 /* channels */, 1 /* input stride */, 1 /* output stride */,
         node->flags,
         &opdata->operator_objects[0]);
       break;
@@ -52,35 +50,44 @@ static enum xnn_status create_copy_operator(
 
 static enum xnn_status reshape_copy_operator(
   struct xnn_operator_data* opdata,
-  const struct xnn_value* values,
+  struct xnn_value* values,
   size_t num_values,
   pthreadpool_t threadpool)
 {
   const uint32_t input_id = opdata->inputs[0];
   assert(input_id < num_values);
   const size_t batch_size = xnn_shape_multiply_all_dims(&values[input_id].shape);
+  const size_t old_workspace_size = opdata->workspace_size;
+  enum xnn_status status = xnn_status_invalid_state;
   switch (opdata->operator_objects[0]->type) {
     case xnn_operator_type_copy_nc_x8:
-      return xnn_reshape_copy_nc_x8(
+      status = xnn_reshape_copy_nc_x8(
         opdata->operator_objects[0],
         batch_size,
+        1 /* channels */, 1 /* input stride */, 1 /* output stride */,
         threadpool);
       break;
     case xnn_operator_type_copy_nc_x16:
-      return xnn_reshape_copy_nc_x16(
+      status = xnn_reshape_copy_nc_x16(
         opdata->operator_objects[0],
         batch_size,
+        1 /* channels */, 1 /* input stride */, 1 /* output stride */,
         threadpool);
       break;
     case xnn_operator_type_copy_nc_x32:
-      return xnn_reshape_copy_nc_x32(
+      status = xnn_reshape_copy_nc_x32(
         opdata->operator_objects[0],
         batch_size,
+        1 /* channels */, 1 /* input stride */, 1 /* output stride */,
         threadpool);
       break;
     default:
       XNN_UNREACHABLE;
   }
+  if (status != xnn_status_success) {
+    return status;
+  }
+  return resize_unary_elementwise_output_tensor(opdata, values, num_values, old_workspace_size, threadpool);
 }
 
 static enum xnn_status setup_copy_operator(

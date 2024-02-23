@@ -2078,7 +2078,6 @@ ExecutionPlan QU8MobileNetV2(pthreadpool_t threadpool) {
 
   xnn_operator_t op62 = nullptr;
   status = xnn_create_global_average_pooling_nwc_qu8(
-    1280 /* channels */, 1280 /* input stride */, 1280 /* output stride */,
     0 /* input zero point */, 0.023528477177023888 /* input scale */,
     0 /* output zero point */, 0.023528477177023888 /* output scale */,
     0 /* output min */, 255 /* output max */,
@@ -2122,9 +2121,6 @@ ExecutionPlan QU8MobileNetV2(pthreadpool_t threadpool) {
 
   xnn_operator_t op64 = nullptr;
   status = xnn_create_copy_nc_x8(
-    1 /* channels */,
-    1 /* input stride */,
-    1 /* output stride */,
     0 /* flags */,
     &op64);
   if (status != xnn_status_success) {
@@ -2996,6 +2992,7 @@ ExecutionPlan QU8MobileNetV2(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_qu8(
     op62,
     /*batch_size=*/1, 49 /* width */,
+    1280 /* channels */, 1280 /* input stride */, 1280 /* output stride */,
     &op62_workspace_size, &op62_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op62_workspace_size);
@@ -3021,6 +3018,9 @@ ExecutionPlan QU8MobileNetV2(pthreadpool_t threadpool) {
   status = xnn_reshape_copy_nc_x8(
     op64,
     /*batch_size=*/1001,
+    1 /* channels */,
+    1 /* input stride */,
+    1 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #64" << std::endl;

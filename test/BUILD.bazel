@@ -1022,6 +1022,9 @@ xnnpack_unit_test(
     name = "f32_spmm_minmax_test",
     srcs = [
         "f32-spmm-minmax.cc",
+        "f32-spmm-minmax-2.cc",
+        "f32-spmm-minmax-3.cc",
+        "f32-spmm-minmax-4.cc",
         "spmm-microkernel-tester.h",
     ],
     deps = MICROKERNEL_TEST_DEPS,
@@ -1370,6 +1373,15 @@ xnnpack_unit_test(
 )
 
 xnnpack_unit_test(
+    name = "f32_vrsqrt_test",
+    srcs = [
+        "f32-vrsqrt.cc",
+        "vunary-microkernel-tester.h",
+    ],
+    deps = MICROKERNEL_TEST_DEPS,
+)
+
+xnnpack_unit_test(
     name = "f32_vscaleexpminusmax_test",
     srcs = [
         "f32-vscaleexpminusmax.cc",
@@ -1559,6 +1571,9 @@ xnnpack_unit_test(
     timeout = "moderate",
     srcs = [
         "qd8-f16-qc4w-gemm-minmax.cc",
+        "qd8-f16-qc4w-gemm-minmax-2.cc",
+        "qd8-f16-qc4w-gemm-minmax-3.cc",
+        "qd8-f16-qc4w-gemm-minmax-4.cc",
     ],
     shard_count = 10,
     deps = MICROKERNEL_TEST_DEPS + [
@@ -1627,6 +1642,21 @@ xnnpack_unit_test(
         "qs8-qc8w-gemm-minmax-fp32.cc",
         "qs8-qc8w-gemm-minmax-fp32-2.cc",
         "qs8-qc8w-gemm-minmax-fp32-3.cc",
+    ],
+    shard_count = 10,
+    deps = MICROKERNEL_TEST_DEPS + [
+        ":gemm_microkernel_tester",
+    ],
+)
+
+xnnpack_unit_test(
+    name = "qd8_f16_qc8w_igemm_minmax_test",
+    timeout = "moderate",
+    srcs = [
+        "qd8-f16-qc8w-igemm-minmax.cc",
+        "qd8-f16-qc8w-igemm-minmax-2.cc",
+        "qd8-f16-qc8w-igemm-minmax-3.cc",
+        "qd8-f16-qc8w-igemm-minmax-4.cc",
     ],
     shard_count = 10,
     deps = MICROKERNEL_TEST_DEPS + [
@@ -1724,6 +1754,15 @@ xnnpack_unit_test(
 )
 
 xnnpack_unit_test(
+    name = "qs8_f16_vcvt_test",
+    srcs = [
+        "qs8-f16-vcvt.cc",
+        "vcvt-microkernel-tester.h",
+    ],
+    deps = MICROKERNEL_TEST_DEPS,
+)
+
+xnnpack_unit_test(
     name = "qs8_f32_vcvt_test",
     srcs = [
         "qs8-f32-vcvt.cc",
@@ -1748,85 +1787,6 @@ xnnpack_unit_test(
         "qs8-gavgpool-minmax-rndnu.cc",
     ],
     deps = MICROKERNEL_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "qs8_gemm_minmax_fp32_test",
-    timeout = "moderate",
-    srcs = [
-        "qs8-gemm-minmax-fp32.cc",
-        "qs8-gemm-minmax-fp32-2.cc",
-    ],
-    shard_count = 10,
-    deps = MICROKERNEL_TEST_DEPS + [
-        ":gemm_microkernel_tester",
-    ],
-)
-
-xnnpack_unit_test(
-    name = "qs8_gemm_jit_rndnu_test",
-    srcs = [
-        "qs8-gemm-jit-rndnu.cc",
-    ],
-    deps = MICROKERNEL_TEST_DEPS + [
-        ":gemm_microkernel_tester",
-        "//:jit_test_mode",
-    ],
-)
-
-xnnpack_unit_test(
-    name = "qs8_gemm_minmax_rndnu_test",
-    timeout = "moderate",
-    srcs = [
-        "qs8-gemm-minmax-rndnu.cc",
-        "qs8-gemm-minmax-rndnu-2.cc",
-        "qs8-gemm-minmax-rndnu-3.cc",
-        "qs8-gemm-minmax-rndnu-4.cc",
-        "qs8-gemm-minmax-rndnu-5.cc",
-    ],
-    shard_count = 10,
-    deps = MICROKERNEL_TEST_DEPS + [
-        ":gemm_microkernel_tester",
-    ],
-)
-
-xnnpack_unit_test(
-    name = "qs8_igemm_minmax_fp32_test",
-    timeout = "moderate",
-    srcs = [
-        "qs8-igemm-minmax-fp32.cc",
-        "qs8-igemm-minmax-fp32-2.cc",
-    ],
-    shard_count = 10,
-    deps = MICROKERNEL_TEST_DEPS + [
-        ":gemm_microkernel_tester",
-    ],
-)
-
-xnnpack_unit_test(
-    name = "qs8_igemm_jit_rndnu_test",
-    srcs = [
-        "qs8-igemm-jit-rndnu.cc",
-    ],
-    deps = MICROKERNEL_TEST_DEPS + [
-        ":gemm_microkernel_tester",
-        "//:jit_test_mode",
-    ],
-)
-
-xnnpack_unit_test(
-    name = "qs8_igemm_minmax_rndnu_test",
-    timeout = "moderate",
-    srcs = [
-        "qs8-igemm-minmax-rndnu.cc",
-        "qs8-igemm-minmax-rndnu-2.cc",
-        "qs8-igemm-minmax-rndnu-3.cc",
-        "qs8-igemm-minmax-rndnu-4.cc",
-    ],
-    shard_count = 10,
-    deps = MICROKERNEL_TEST_DEPS + [
-        ":gemm_microkernel_tester",
-    ],
 )
 
 xnnpack_unit_test(
@@ -3330,6 +3290,20 @@ xnnpack_unit_test(
 )
 
 xnnpack_unit_test(
+    name = "abs_reshape_test",
+    srcs = [
+        "abs-reshape.cc",
+    ],
+    deps = [
+        ":subgraph_unary_tester",
+        "//:XNNPACK_test_mode",
+        "//:node_type",
+        "//:operators_test_mode",
+        "//:subgraph_test_mode",
+    ],
+)
+
+xnnpack_unit_test(
     name = "abs_test",
     srcs = [
         "abs.cc",
@@ -3358,6 +3332,20 @@ xnnpack_unit_test(
 )
 
 xnnpack_unit_test(
+    name = "add2_reshape_test",
+    srcs = [
+        "add2-reshape.cc",
+    ],
+    deps = [
+        ":subgraph_unary_tester",
+        "//:XNNPACK_test_mode",
+        "//:node_type",
+        "//:operators_test_mode",
+        "//:subgraph_test_mode",
+    ],
+)
+
+xnnpack_unit_test(
     name = "argmax_pooling_2d_test",
     srcs = [
         "argmax-pooling-2d.cc",
@@ -3376,6 +3364,22 @@ xnnpack_unit_test(
     name = "average_pooling_2d_test",
     srcs = [
         "average-pooling-2d.cc",
+    ],
+    deps = [
+        "//:XNNPACK_test_mode",
+        "//:aligned_allocator",
+        "//:common",
+        "//:node_type",
+        "//:operator_utils",
+        "//:operators_test_mode",
+        "//:subgraph_test_mode",
+    ],
+)
+
+xnnpack_unit_test(
+    name = "average_pooling_2d_reshape_test",
+    srcs = [
+        "average-pooling-2d-reshape.cc",
     ],
     deps = [
         "//:XNNPACK_test_mode",
@@ -3474,6 +3478,19 @@ xnnpack_unit_test(
     name = "concatenate4_test",
     srcs = [
         "concatenate4.cc",
+    ],
+    deps = [
+        "//:XNNPACK_test_mode",
+        "//:node_type",
+        "//:operators_test_mode",
+        "//:subgraph_test_mode",
+    ],
+)
+
+xnnpack_unit_test(
+    name = "concatenate5_test",
+    srcs = [
+        "concatenate5.cc",
     ],
     deps = [
         "//:XNNPACK_test_mode",
@@ -3998,6 +4015,20 @@ xnnpack_unit_test(
 )
 
 xnnpack_unit_test(
+    name = "reshape_2d_test",
+    srcs = [
+        "reshape-2d.cc",
+    ],
+    deps = [
+        ":subgraph_unary_tester",
+        "//:XNNPACK_test_mode",
+        "//:node_type",
+        "//:operators_test_mode",
+        "//:subgraph_test_mode",
+    ],
+)
+
+xnnpack_unit_test(
     name = "static_resize_bilinear_2d_test",
     srcs = [
         "static-resize-bilinear-2d.cc",
@@ -4068,6 +4099,20 @@ xnnpack_unit_test(
 )
 
 xnnpack_unit_test(
+    name = "transpose_reshape_test",
+    srcs = [
+        "transpose-reshape.cc",
+    ],
+    deps = [
+        ":subgraph_unary_tester",
+        "//:XNNPACK_test_mode",
+        "//:node_type",
+        "//:operators_test_mode",
+        "//:subgraph_test_mode",
+    ],
+)
+
+xnnpack_unit_test(
     name = "unpooling_2d_test",
     srcs = [
         "unpooling-2d.cc",
@@ -4096,6 +4141,19 @@ xnnpack_unit_test(
 )
 
 ############################### Misc unit tests ###############################
+
+xnnpack_unit_test(
+    name = "runtime_test",
+    srcs = [
+        "runtime.cc",
+        "runtime-tester.h",
+        "subgraph-tester.h",
+    ],
+    deps = [
+        "//:XNNPACK_test_mode",
+        "//:subgraph_test_mode",
+    ],
+)
 
 xnnpack_unit_test(
     name = "subgraph_test",

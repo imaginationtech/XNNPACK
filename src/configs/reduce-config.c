@@ -134,6 +134,19 @@ static void init_f32_rminmax_config(void) {
       .element_tile = 4,
     };
   #elif XNN_ARCH_RISCV
+    #if XNN_ENABLE_RISCV_VECTOR
+      const struct xnn_hardware_config* hardware_config = xnn_init_hardware_config();
+      f32_rminmax_config = (struct xnn_reduce_config) {
+        .ukernel = (xnn_reduce_ukernel_fn) xnn_f32_rminmax_ukernel__rvv_u8v,
+        .element_tile = hardware_config->vlenb * 2,  // VLENB * (8 / sizeof(float))
+      };
+    #else
+      f32_rminmax_config = (struct xnn_reduce_config) {
+        .ukernel = (xnn_reduce_ukernel_fn) xnn_f32_rminmax_ukernel__scalar_u4_acc4,
+        .element_tile = 4,
+      };
+    #endif
+  #elif XNN_ARCH_PPC64
     f32_rminmax_config = (struct xnn_reduce_config) {
       .ukernel = (xnn_reduce_ukernel_fn) xnn_f32_rminmax_ukernel__scalar_u4_acc4,
       .element_tile = 4,
@@ -167,7 +180,13 @@ static void init_f32_rsum_config(void) {
   #elif XNN_ARCH_X86 || XNN_ARCH_X86_64
     const struct xnn_hardware_config* hardware_config = xnn_init_hardware_config();
     assert(hardware_config != NULL);
-    if (hardware_config->use_x86_avx) {
+    if (!XNN_PLATFORM_MOBILE && hardware_config->use_x86_avx512f) {
+      f32_rsum_config = (struct xnn_reduce_config) {
+        .ukernel = (xnn_reduce_ukernel_fn) xnn_f32_rsum_ukernel__avx512f_u64_acc4,
+        .init.f32_scale = xnn_init_f32_scale_scalar_params,
+        .element_tile = 64,
+      };
+    } else if (hardware_config->use_x86_avx) {
       f32_rsum_config = (struct xnn_reduce_config) {
         .ukernel = (xnn_reduce_ukernel_fn) xnn_f32_rsum_ukernel__avx_u32_acc4,
         .init.f32_scale = xnn_init_f32_scale_avx_params,
@@ -193,6 +212,12 @@ static void init_f32_rsum_config(void) {
       .element_tile = 4,
     };
   #elif XNN_ARCH_RISCV
+    f32_rsum_config = (struct xnn_reduce_config) {
+      .ukernel = (xnn_reduce_ukernel_fn) xnn_f32_rsum_ukernel__scalar_u4_acc4,
+      .init.f32_scale = xnn_init_f32_scale_scalar_params,
+      .element_tile = 4,
+    };
+  #elif XNN_ARCH_PPC64
     f32_rsum_config = (struct xnn_reduce_config) {
       .ukernel = (xnn_reduce_ukernel_fn) xnn_f32_rsum_ukernel__scalar_u4_acc4,
       .init.f32_scale = xnn_init_f32_scale_scalar_params,

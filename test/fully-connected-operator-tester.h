@@ -203,6 +203,204 @@ class FullyConnectedOperatorTester {
     }
   }
 
+  void TestQD8F16QC4W() const {
+    ASSERT_EQ(weights_type(), WeightsType::Default);
+
+    std::random_device random_device;
+    auto rng = std::mt19937(random_device());
+    std::uniform_real_distribution<float> f32dist(-1.f, 1.f);
+    std::uniform_real_distribution<float> f32idist(0.5f, 2.0f);
+    std::uniform_int_distribution<int32_t> w8dist(-std::numeric_limits<int8_t>::max(), std::numeric_limits<int8_t>::max());
+    // Weights typically have a Gaussian distrubution centred on zero. A
+    // standard deviation of 40 means that > 99.99% of values fall in the
+    // -127->127 range. However, the reduce the chance of overflow, we constrain
+    // the weights further.
+    std::normal_distribution<float> normal_dist{0.f, 10.f};
+
+
+    const size_t k2 =  round_up_po2(input_channels(), 2);  // tester assumes byte aligned rows
+
+    std::vector<int8_t> input(XNN_EXTRA_BYTES / sizeof(int8_t) +
+      (batch_size() - 1) * input_stride() + input_channels());
+    const size_t kernel_stride = calc_kernel_stride();
+    std::vector<uint8_t> kernel((transpose_weights() ? k2 : output_channels()) * kernel_stride);
+    std::vector<float> bias(output_channels());
+    std::vector<uint16_t> output((batch_size() - 1) * output_stride() + output_channels());
+    std::vector<float> output_ref(batch_size() * output_channels());
+    std::vector<xnn_qd8_quantization_params> quantization_params(batch_size() + XNN_EXTRA_QUANTIZATION_PARAMS);
+    std::vector<float> kernel_scale(output_channels());
+
+    for (size_t iteration = 0; iteration < iterations(); iteration++) {
+      std::generate(input.begin(), input.end(), [&]() { return w8dist(rng); });
+      std::generate(kernel.begin(), kernel.end(), [&]() { return (int8_t) normal_dist(rng); });
+      std::generate(bias.begin(), bias.end(), [&]() { return f32dist(rng); });
+      std::generate(kernel_scale.begin(), kernel_scale.end(), [&]() { return f32idist(rng); });
+      std::generate(quantization_params.begin(), quantization_params.end(), [&]() { return xnn_qd8_quantization_params{w8dist(rng), f32idist(rng)}; });
+      for (size_t i = batch_size(); i < batch_size() + XNN_EXTRA_QUANTIZATION_PARAMS; ++i) {
+        quantization_params[i].zero_point = quantization_params[batch_size() - 1].zero_point;
+        quantization_params[i].inv_scale = quantization_params[batch_size() - 1].inv_scale;
+      }
+      std::fill(output.begin(), output.end(), UINT16_C(0xDEAD));
+
+      // Compute reference results, without renormalization.
+      std::fill(output_ref.begin(), output_ref.end(), 0);
+
+      if (transpose_weights()) {
+        for (size_t mi = 0; mi < batch_size(); mi++) {
+          for (size_t ni = 0; ni < output_channels(); ni++) {
+            for (size_t ki = 0; ki < input_channels(); ki++) {
+              const size_t kernel_index = ki * kernel_stride + (ni / 2);
+              const int8_t kernel_value =
+                int8_t((ni % 2 == 0) ? (kernel[kernel_index] & 15) : (kernel[kernel_index] >> 4)) - kernel_zero_point();
+              output_ref[mi * output_channels() + ni] +=
+                  (int32_t(input[mi * input_stride() + ki]) - quantization_params[mi].zero_point) *
+                  static_cast<float>(static_cast<int32_t>(kernel_value));
+            }
+            output_ref[mi * output_channels() + ni] *= quantization_params[mi].inv_scale * kernel_scale[ni];
+            if (has_bias()) {
+              output_ref[mi * output_channels() + ni] += bias[ni];
+            }
+          }
+        }
+
+      } else {
+        for (size_t mi = 0; mi < batch_size(); mi++) {
+          for (size_t ni = 0; ni < output_channels(); ni++) {
+            for (size_t ki = 0; ki < input_channels(); ki++) {
+              const size_t kernel_index = ni * kernel_stride + (ki / 2);
+              const int8_t kernel_value =
+                int8_t((ki % 2 == 0) ? (kernel[kernel_index] & 15) : (kernel[kernel_index] >> 4)) - kernel_zero_point();
+              output_ref[mi * output_channels() + ni] +=
+                  (int32_t(input[mi * input_stride() + ki]) - quantization_params[mi].zero_point) *
+                  static_cast<float>(static_cast<int32_t>(kernel_value));
+            }
+            output_ref[mi * output_channels() + ni] *= quantization_params[mi].inv_scale * kernel_scale[ni];
+            if (has_bias()) {
+              output_ref[mi * output_channels() + ni] += bias[ni];
+            }
+          }
+        }
+      }
+
+      // Compute clamping parameters.
+      const float accumulated_min = *std::min_element(output_ref.cbegin(), output_ref.cend());
+      const float accumulated_max = *std::max_element(output_ref.cbegin(), output_ref.cend());
+      const float accumulated_range = accumulated_max - accumulated_min;
+      const float scaled_min = fp16_ieee_to_fp32_value(fp16_ieee_from_fp32_value(accumulated_min + accumulated_range / 255.0f * float(qmin())));
+      const float scaled_max = fp16_ieee_to_fp32_value(fp16_ieee_from_fp32_value(accumulated_max - accumulated_range / 255.0f * float(255 - qmax())));
+      const float output_min = scaled_min == scaled_max ? -std::numeric_limits<float>::infinity() : scaled_min;
+      const float output_max = scaled_min == scaled_max ? +std::numeric_limits<float>::infinity() : scaled_max;
+
+      // Clamp reference results.
+      for (size_t i = 0; i < output_ref.size(); ++i) {
+        output_ref[i] = std::max(std::min(output_ref[i], output_max), output_min);
+        output_ref[i] = fp16_ieee_to_fp32_value(fp16_ieee_from_fp32_value(output_ref[i]));
+      }
+
+      // Create, setup, run, and destroy Fully Connected operator.
+      ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
+      xnn_operator_t fully_connected_op = nullptr;
+
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
+      if (use_weights_cache()) {
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
+      }
+
+      const xnn_status status = xnn_create_fully_connected_nc_qd8_f16_qc4w(
+          input_channels(), output_channels(),
+          input_stride(), output_stride(),
+          kernel_zero_point(),
+          kernel_scale.data(),
+          kernel.data(), has_bias() ? bias.data() : nullptr,
+          output_min, output_max,
+          transpose_weights() ? XNN_FLAG_TRANSPOSE_WEIGHTS : 0,
+          nullptr, auto_weights_cache.get(),
+          &fully_connected_op);
+      if (status == xnn_status_unsupported_hardware) {
+        GTEST_SKIP();
+      }
+
+      ASSERT_EQ(xnn_status_success, status);
+      ASSERT_NE(nullptr, fully_connected_op);
+      if (use_weights_cache()) {
+        ASSERT_EQ(xnn_status_success,
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
+      }
+
+      // Smart pointer to automatically delete fully_connected_op.
+      std::unique_ptr<xnn_operator, decltype(&xnn_delete_operator)> auto_fully_connected_op(fully_connected_op, xnn_delete_operator);
+
+      ASSERT_EQ(xnn_status_success,
+        xnn_reshape_fully_connected_nc_qd8_f16_qc4w(
+          fully_connected_op,
+          batch_size(),
+          /*threadpool=*/nullptr));
+
+      ASSERT_EQ(xnn_status_success,
+        xnn_setup_fully_connected_nc_qd8_f16_qc4w(
+          fully_connected_op,
+          input.data(), output.data(),
+          reinterpret_cast<const struct xnn_dynamic_quantization_params*>(quantization_params.data())));
+
+      ASSERT_EQ(xnn_status_success,
+        xnn_run_operator(fully_connected_op, /*threadpool=*/nullptr));
+
+      // Verify results.
+      VerifyF16(output, output_ref, output_max, output_min);
+
+      if (use_weights_cache()) {
+        // Create another operator with the same weights cache.
+        xnn_operator_t fully_connected_op2 = nullptr;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
+
+        ASSERT_EQ(xnn_status_success, xnn_create_fully_connected_nc_qd8_f16_qc4w(
+            input_channels(), output_channels(),
+            input_stride(), output_stride(),
+            kernel_zero_point(),
+            kernel_scale.data(),
+            kernel.data(), has_bias() ? bias.data() : nullptr,
+            output_min, output_max,
+            transpose_weights() ? XNN_FLAG_TRANSPOSE_WEIGHTS : 0,
+            nullptr, auto_weights_cache.get(),
+            &fully_connected_op2));
+        ASSERT_NE(nullptr, fully_connected_op2);
+
+        // Smart pointer to automatically delete fully_connected_op.
+        std::unique_ptr<xnn_operator, decltype(&xnn_delete_operator)>
+            auto_fully_connected_op(fully_connected_op2, xnn_delete_operator);
+
+        ASSERT_EQ(xnn_status_success,
+          xnn_reshape_fully_connected_nc_qd8_f16_qc4w(
+            fully_connected_op2,
+            batch_size(),
+            /*threadpool=*/nullptr));
+
+        std::vector<float> output2(output.size(), nanf(""));
+        ASSERT_EQ(xnn_status_success,
+          xnn_setup_fully_connected_nc_qd8_f16_qc4w(
+            fully_connected_op2,
+            input.data(), output2.data(),
+            reinterpret_cast<const struct xnn_dynamic_quantization_params*>(quantization_params.data())));
+
+
+        ASSERT_EQ(
+            xnn_status_success,
+            xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
+
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
+
+        VerifyF16(output, output_ref, output_max, output_min);
+      }
+    }
+  }
+
   void TestQD8F32QC4W() const {
     ASSERT_EQ(weights_type(), WeightsType::Default);
 
@@ -294,12 +492,16 @@ class FullyConnectedOperatorTester {
       ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
       xnn_operator_t fully_connected_op = nullptr;
 
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const xnn_status status = xnn_create_fully_connected_nc_qd8_f32_qc4w(
@@ -320,7 +522,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -347,7 +549,7 @@ class FullyConnectedOperatorTester {
       if (use_weights_cache()) {
         // Create another operator with the same weights cache.
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
 
         ASSERT_EQ(xnn_status_success, xnn_create_fully_connected_nc_qd8_f32_qc4w(
             input_channels(), output_channels(),
@@ -383,7 +585,7 @@ class FullyConnectedOperatorTester {
             xnn_status_success,
             xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
 
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
 
         VerifyF32(output, output_ref, output_max, output_min);
       }
@@ -476,12 +678,16 @@ class FullyConnectedOperatorTester {
       ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
       xnn_operator_t fully_connected_op = nullptr;
 
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const xnn_status status = xnn_create_fully_connected_nc_qd8_f16_qc8w(
@@ -500,7 +706,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -527,7 +733,7 @@ class FullyConnectedOperatorTester {
       if (use_weights_cache()) {
         // Create another operator with the same weights cache.
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
 
         ASSERT_EQ(xnn_status_success, xnn_create_fully_connected_nc_qd8_f16_qc8w(
             input_channels(), output_channels(),
@@ -562,7 +768,7 @@ class FullyConnectedOperatorTester {
             xnn_status_success,
             xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
 
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
 
         VerifyF16(output, output_ref, output_max, output_min);
       }
@@ -649,12 +855,16 @@ class FullyConnectedOperatorTester {
       ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
       xnn_operator_t fully_connected_op = nullptr;
 
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const xnn_status status = xnn_create_fully_connected_nc_qd8_f32_qc8w(
@@ -673,7 +883,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -700,7 +910,7 @@ class FullyConnectedOperatorTester {
       if (use_weights_cache()) {
         // Create another operator with the same weights cache.
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
 
         ASSERT_EQ(xnn_status_success, xnn_create_fully_connected_nc_qd8_f32_qc8w(
             input_channels(), output_channels(),
@@ -735,7 +945,7 @@ class FullyConnectedOperatorTester {
             xnn_status_success,
             xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
 
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
 
         VerifyF32(output, output_ref, output_max, output_min);
       }
@@ -818,12 +1028,16 @@ class FullyConnectedOperatorTester {
       ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
       xnn_operator_t fully_connected_op = nullptr;
 
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const xnn_status status = xnn_create_fully_connected_nc_qs8(
@@ -843,7 +1057,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -869,7 +1083,7 @@ class FullyConnectedOperatorTester {
       if (use_weights_cache()) {
         // Create another operator with the same weights cache.
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
 
         ASSERT_EQ(xnn_status_success,
                   xnn_create_fully_connected_nc_qs8(
@@ -903,7 +1117,7 @@ class FullyConnectedOperatorTester {
             xnn_status_success,
             xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
 
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
 
         VerifyQS8(output, output_ref, double(output_zero_point));
       }
@@ -1039,12 +1253,16 @@ class FullyConnectedOperatorTester {
       ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
       xnn_operator_t fully_connected_op = nullptr;
 
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const xnn_status status = xnn_create_fully_connected_nc_qs8_qc8w(
@@ -1064,7 +1282,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -1090,7 +1308,7 @@ class FullyConnectedOperatorTester {
       if (use_weights_cache()) {
         // Create another operator with the same weights cache.
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
 
         ASSERT_EQ(xnn_status_success,
                   xnn_create_fully_connected_nc_qs8_qc8w(
@@ -1124,7 +1342,7 @@ class FullyConnectedOperatorTester {
             xnn_status_success,
             xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
 
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
 
         VerifyQC8(output, output_ref);
       }
@@ -1220,12 +1438,16 @@ class FullyConnectedOperatorTester {
       ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
       xnn_operator_t fully_connected_op = nullptr;
 
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const xnn_status status = xnn_create_fully_connected_nc_qu8(
@@ -1245,7 +1467,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -1270,7 +1492,7 @@ class FullyConnectedOperatorTester {
       if (use_weights_cache()) {
         // Create another operator with the same weights cache.
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
 
         ASSERT_EQ(xnn_status_success,
                   xnn_create_fully_connected_nc_qu8(
@@ -1299,7 +1521,7 @@ class FullyConnectedOperatorTester {
             xnn_status_success,
             xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
 
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
 
         VerifyQU8(output2, output_ref, double(output_zero_point));
       }
@@ -1401,12 +1623,16 @@ class FullyConnectedOperatorTester {
           auto_code_cache.reset(&code_cache);
         }
       #endif
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const xnn_status status = xnn_create_fully_connected_nc_f32(
@@ -1424,7 +1650,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -1467,7 +1693,7 @@ class FullyConnectedOperatorTester {
         #endif
         // Create another operator with the same weights cache.
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
         ASSERT_EQ(xnn_status_success,
                   xnn_create_fully_connected_nc_f32(
                       input_channels(), output_channels(), input_stride(),
@@ -1503,7 +1729,7 @@ class FullyConnectedOperatorTester {
 
         ASSERT_EQ(xnn_status_success,
                   xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
 
         VerifyF32(output, output_ref, output_max, output_min);
       }
@@ -1616,12 +1842,16 @@ class FullyConnectedOperatorTester {
           auto_code_cache.reset(&code_cache);
         }
       #endif
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const xnn_status status = xnn_create_fully_connected_nc_f32_qc4w(
@@ -1640,7 +1870,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -1683,7 +1913,7 @@ class FullyConnectedOperatorTester {
         #endif
         // Create another operator with the same weights cache.
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
         ASSERT_EQ(xnn_status_success,
                   xnn_create_fully_connected_nc_f32_qc4w(
                       input_channels(), output_channels(),
@@ -1722,7 +1952,7 @@ class FullyConnectedOperatorTester {
 
         ASSERT_EQ(xnn_status_success,
                   xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
 
         VerifyF32(output, output_ref, output_max, output_min);
       }
@@ -1829,12 +2059,16 @@ class FullyConnectedOperatorTester {
           auto_code_cache.reset(&code_cache);
         }
       #endif
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const xnn_status status = xnn_create_fully_connected_nc_f32_qc8w(
@@ -1853,7 +2087,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -1896,7 +2130,7 @@ class FullyConnectedOperatorTester {
         #endif
         // Create another operator with the same weights cache.
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
         ASSERT_EQ(xnn_status_success,
                   xnn_create_fully_connected_nc_f32_qc8w(
                       input_channels(), output_channels(),
@@ -1936,7 +2170,7 @@ class FullyConnectedOperatorTester {
 
         ASSERT_EQ(xnn_status_success,
                   xnn_run_operator(fully_connected_op2, /*threadpool=*/nullptr));
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
 
         VerifyF32(output, output_ref, output_max, output_min);
       }
@@ -2022,12 +2256,16 @@ class FullyConnectedOperatorTester {
       ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
       xnn_operator_t fully_connected_op = nullptr;
 
-      xnn_weights_cache weights_cache;
-      std::unique_ptr<xnn_weights_cache, decltype(&xnn_release_weights_cache)> auto_weights_cache(
-        nullptr, xnn_release_weights_cache);
+      struct xnn_internal_weights_cache* internal_weights_cache = nullptr;
+      std::unique_ptr<xnn_weights_cache_provider, decltype(&xnn_delete_weights_cache)> auto_weights_cache(
+        nullptr, xnn_delete_weights_cache);
       if (use_weights_cache()) {
-        xnn_init_weights_cache(&weights_cache);
-        auto_weights_cache.reset(&weights_cache);
+        xnn_weights_cache_t weights_cache = nullptr;
+        xnn_create_weights_cache(&weights_cache);
+        auto_weights_cache.reset(weights_cache);
+        if (weights_cache) {
+          internal_weights_cache = (struct xnn_internal_weights_cache*) weights_cache->context;
+        }
       }
 
       const void* kernel_data = kernel.data();
@@ -2058,7 +2296,7 @@ class FullyConnectedOperatorTester {
       ASSERT_NE(nullptr, fully_connected_op);
       if (use_weights_cache()) {
         ASSERT_EQ(xnn_status_success,
-                  xnn_finalize_weights_cache(&weights_cache, xnn_weights_cache_finalization_kind_soft));
+                  xnn_finalize_weights_cache(auto_weights_cache.get(), xnn_weights_cache_finalization_kind_soft));
       }
 
       // Smart pointer to automatically delete fully_connected_op.
@@ -2083,7 +2321,7 @@ class FullyConnectedOperatorTester {
 
       if (use_weights_cache()) {
         xnn_operator_t fully_connected_op2 = nullptr;
-        size_t old_weights_cache_size = weights_cache.cache.weights.size;
+        size_t old_weights_cache_size = internal_weights_cache->cache.weights.size;
         ASSERT_EQ(xnn_status_success,
                   xnn_create_fully_connected_nc_f16(
                       input_channels(), output_channels(), input_stride(),
@@ -2116,7 +2354,7 @@ class FullyConnectedOperatorTester {
 
         // Verify results.
         VerifyF16(output2, output_ref, output_max, output_min);
-        VerifyWeightsCache(weights_cache, old_weights_cache_size);
+        VerifyWeightsCache(*internal_weights_cache, old_weights_cache_size);
       }
     }
   }
@@ -2148,7 +2386,7 @@ class FullyConnectedOperatorTester {
     }
   }
 
-  void VerifyWeightsCache(const xnn_weights_cache& weights_cache, size_t old_size) const {
+  void VerifyWeightsCache(const xnn_internal_weights_cache& weights_cache, size_t old_size) const {
     ASSERT_EQ(weights_cache.cache.hits, 1);
     // Ensure that we did not write more weights to the cache because it was a cache hit.
     ASSERT_EQ(old_size, weights_cache.cache.weights.size);

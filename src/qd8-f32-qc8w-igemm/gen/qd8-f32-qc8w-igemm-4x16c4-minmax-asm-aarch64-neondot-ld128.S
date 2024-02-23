@@ -50,13 +50,13 @@ BEGIN_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot
         ADD         x2, x2, 3               // kc = (kc + 3) & ~3
 
         ADD         x17, x16, x7            // c2 = c1 + cm_stride
-        LDR         x12, [sp, 16]      // Load zero
+        LDR         x12, [sp, 16]       // Load zero
         LDR         x11, [sp, 32]      // Load params pointer
                                             // if mr <= 2
         CSEL        x17, x16, x17, LS       //   c2 = c1
         BIC         x2, x2, 3
-        STR         x19, [sp, -56] // Push x19 to the stack
-        LDR         x19, [sp, 24] // Load zero_data
+        STR         x19, [sp, -56]      // Push x19 to the stack
+        LDR         x19, [sp, 24]       // Load zero_data
         LDR         x15, [sp, 40]           // &quantization_params[0].zero_point
         STP         d8,  d9, [sp, -48]!
         STP         d10, d11, [sp, 16]
@@ -105,8 +105,8 @@ BEGIN_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot
         CMP         x15, x12                // if a2 == zero
         ADD         x15, x15, x8            // a2 += a_offset
         CSEL        x15, x19, x15, EQ       //   a2 = zero_data, else a2 += a_offset
-        CMP         x10, x12                  // if a3 == zero
-        ADD         x10, x10, x8              // a3 += a_offset
+        CMP         x10, x12                    // if a3 == zero
+        ADD         x10, x10, x8                // a3 += a_offset
         CSEL        x10, x19, x10, EQ       //   a3 = zero_data, else a3 += a_offset
 
         # Is there at least 16 bytes for main loop?
@@ -317,7 +317,6 @@ BEGIN_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot
         STP         q16, q20, [x6]
         STP         q24, q28, [x6, #32]
         ADD         x6, x6, x0
-
         SUB         x4, x4, x3              // a -= ks
 
         # nc loop
@@ -467,6 +466,44 @@ BEGIN_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot
         LDP         d12, d13, [sp, 32]
         LDP         d10, d11, [sp, 16]
         LDP         d8, d9, [sp], 48
+        RET
+6:
+        TBZ         x1, 3, 7f
+        STR         d3, [x7], 8
+        STR         d2, [x17], 8
+        DUP         d3, v3.d[1]
+        DUP         d2, v2.d[1]
+        STR         d1, [x16], 8
+        STR         d0, [x6], 8
+        DUP         d1, v1.d[1]
+        DUP         d0, v0.d[1]
+7:
+        TBZ         x1, 2, 8f
+        STR         s3, [x7], 4
+        STR         s2, [x17], 4
+        DUP         s3, v3.s[1]
+        DUP         s2, v2.s[1]
+        STR         s1, [x16], 4
+        STR         s0, [x6], 4
+        DUP         s1, v1.s[1]
+        DUP         s0, v0.s[1]
+8:
+        TBZ         x1, 1, 9f
+        STR         h3, [x7], 2
+        STR         h2, [x17], 2
+        DUP         h3, v3.h[1]
+        DUP         h2, v2.h[1]
+        STR         h1, [x16], 2
+        STR         h0, [x6], 2
+        DUP         h1, v1.h[1]
+        DUP         h0, v0.h[1]
+9:
+        TBZ         x1, 0, 10f
+        STR         b3, [x7]
+        STR         b2, [x17]
+        STR         b1, [x16]
+        STR         b0, [x6]
+10:
         RET
 
 END_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot_ld128

@@ -1737,7 +1737,6 @@ ExecutionPlan FP32MobileNetV2(pthreadpool_t threadpool) {
 
   xnn_operator_t op62 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    1280 /* channels */, 1280 /* input stride */, 1280 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op62);
@@ -1773,9 +1772,6 @@ ExecutionPlan FP32MobileNetV2(pthreadpool_t threadpool) {
 
   xnn_operator_t op64 = nullptr;
   status = xnn_create_copy_nc_x32(
-    1 /* channels */,
-    1 /* input stride */,
-    1 /* output stride */,
     0 /* flags */,
     &op64);
   if (status != xnn_status_success) {
@@ -1786,9 +1782,6 @@ ExecutionPlan FP32MobileNetV2(pthreadpool_t threadpool) {
 
   xnn_operator_t op65 = nullptr;
   status = xnn_create_softmax_nc_f32(
-    /*channels=*/1001,
-    /*input_stride=*/1001,
-    /*output_stride=*/1001,
     /*flags=*/0,
     &op65);
   if (status != xnn_status_success) {
@@ -2660,6 +2653,7 @@ ExecutionPlan FP32MobileNetV2(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op62,
     /*batch_size=*/1, 49 /* width */,
+    1280 /* channels */, 1280 /* input stride */, 1280 /* output stride */,
     &op62_workspace_size, &op62_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op62_workspace_size);
@@ -2685,6 +2679,9 @@ ExecutionPlan FP32MobileNetV2(pthreadpool_t threadpool) {
   status = xnn_reshape_copy_nc_x32(
     op64,
     /*batch_size=*/1001,
+    1 /* channels */,
+    1 /* input stride */,
+    1 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #64" << std::endl;
@@ -2693,6 +2690,9 @@ ExecutionPlan FP32MobileNetV2(pthreadpool_t threadpool) {
 
   status = xnn_reshape_softmax_nc_f32(
     op65,
+    /*channels=*/1001,
+    /*input_stride=*/1001,
+    /*output_stride=*/1001,
     /*batch_size=*/1,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {

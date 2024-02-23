@@ -48,7 +48,7 @@ BEGIN_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot
         CMP         x0, 2                   // if mr < 2
         LDR         x8, [sp, 8]             // Load a_offset
         ADD         x16, x6, x7             // c1 = c0 + cm_stride
-        LDR         x12, [sp, 16]      // Load zero
+        LDR         x12, [sp, 16]       // Load zero
         LDR         x11, [sp, 32]      // Load params pointer
         CSEL        x16, x6,  x16, LO       //   c1 = c0
         ADD         x2, x2, 3               // kc = (kc + 3) & ~3
@@ -432,7 +432,7 @@ BEGIN_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot
         # BLOCK 3
         SDOT        v28.4s, v11.16b, v4.4b[1]
         SDOT        v29.4s, v11.16b, v5.4b[1]
-        LDR         x11, [sp, 80]                // reload params pointer
+        LDR         x11, [sp, 80]                  // reload params pointer
         SDOT        v30.4s, v11.16b, v6.4b[1]
         SDOT        v31.4s, v11.16b, v7.4b[1]
 
@@ -505,7 +505,7 @@ BEGIN_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot
         FADD        v21.4s, v21.4s, v1.4s
         FADD        v22.4s, v22.4s, v1.4s
         FADD        v23.4s, v23.4s, v1.4s
-        LD1R        {v0.4s}, [x11], #4      // min
+        LD2R        {v0.4s, v1.4s}, [x11]       // min max
         FADD        v24.4s, v24.4s, v2.4s
         FADD        v25.4s, v25.4s, v2.4s
         FADD        v26.4s, v26.4s, v2.4s
@@ -514,7 +514,6 @@ BEGIN_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot
         FADD        v29.4s, v29.4s, v3.4s
         FADD        v30.4s, v30.4s, v3.4s
         FADD        v31.4s, v31.4s, v3.4s
-        LD1R        {v1.4s}, [x11]          //max
         FMAX        v16.4s, v16.4s, v0.4s
         FMAX        v17.4s, v17.4s, v0.4s
         FMAX        v18.4s, v18.4s, v0.4s
@@ -565,9 +564,7 @@ BEGIN_FUNCTION xnn_qd8_f32_qc8w_igemm_minmax_ukernel_4x16c4__asm_aarch64_neondot
         STP         q16, q20, [x6]
         STP         q24, q28, [x6, #32]
         ADD         x6, x6, x0
-
         SUB         x4, x4, x3              // a -= ks
-        SUB         x11, x11, 4               // rewind params pointer
         B.NE        0b
 
 

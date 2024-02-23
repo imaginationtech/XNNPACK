@@ -161,6 +161,77 @@
 #endif  // XNN_ARCH_ARM || XNN_ARCH_ARM64
 
 
+#if XNN_ARCH_ARM || XNN_ARCH_ARM64
+  TEST(F32_VCLAMP__NEON_U16, batch_eq_16) {
+    TEST_REQUIRES_ARM_NEON;
+    VUnaryMicrokernelTester()
+      .batch_size(16)
+      .Test(xnn_f32_vclamp_ukernel__neon_u16, xnn_init_f32_minmax_scalar_params);
+  }
+
+  TEST(F32_VCLAMP__NEON_U16, batch_div_16) {
+    TEST_REQUIRES_ARM_NEON;
+    for (size_t batch_size = 32; batch_size < 160; batch_size += 16) {
+      VUnaryMicrokernelTester()
+        .batch_size(batch_size)
+        .Test(xnn_f32_vclamp_ukernel__neon_u16, xnn_init_f32_minmax_scalar_params);
+    }
+  }
+
+  TEST(F32_VCLAMP__NEON_U16, batch_lt_16) {
+    TEST_REQUIRES_ARM_NEON;
+    for (size_t batch_size = 1; batch_size < 16; batch_size++) {
+      VUnaryMicrokernelTester()
+        .batch_size(batch_size)
+        .Test(xnn_f32_vclamp_ukernel__neon_u16, xnn_init_f32_minmax_scalar_params);
+    }
+  }
+
+  TEST(F32_VCLAMP__NEON_U16, batch_gt_16) {
+    TEST_REQUIRES_ARM_NEON;
+    for (size_t batch_size = 16 + 1; batch_size < 32; batch_size++) {
+      VUnaryMicrokernelTester()
+        .batch_size(batch_size)
+        .Test(xnn_f32_vclamp_ukernel__neon_u16, xnn_init_f32_minmax_scalar_params);
+    }
+  }
+
+  TEST(F32_VCLAMP__NEON_U16, inplace) {
+    TEST_REQUIRES_ARM_NEON;
+    for (size_t batch_size = 1; batch_size <= 80; batch_size += 15) {
+      VUnaryMicrokernelTester()
+        .batch_size(batch_size)
+        .inplace(true)
+        .Test(xnn_f32_vclamp_ukernel__neon_u16, xnn_init_f32_minmax_scalar_params);
+    }
+  }
+
+  TEST(F32_VCLAMP__NEON_U16, qmin) {
+    TEST_REQUIRES_ARM_NEON;
+    for (uint8_t qmin = 1; qmin < 255; qmin++) {
+      for (size_t batch_size = 1; batch_size <= 80; batch_size += 15) {
+        VUnaryMicrokernelTester()
+          .batch_size(batch_size)
+          .qmin(qmin)
+          .Test(xnn_f32_vclamp_ukernel__neon_u16, xnn_init_f32_minmax_scalar_params);
+      }
+    }
+  }
+
+  TEST(F32_VCLAMP__NEON_U16, qmax) {
+    TEST_REQUIRES_ARM_NEON;
+    for (uint8_t qmax = 1; qmax < 255; qmax++) {
+      for (size_t batch_size = 1; batch_size <= 80; batch_size += 15) {
+        VUnaryMicrokernelTester()
+          .batch_size(batch_size)
+          .qmax(qmax)
+          .Test(xnn_f32_vclamp_ukernel__neon_u16, xnn_init_f32_minmax_scalar_params);
+      }
+    }
+  }
+#endif  // XNN_ARCH_ARM || XNN_ARCH_ARM64
+
+
 #if XNN_ENABLE_RISCV_VECTOR && XNN_ARCH_RISCV
   TEST(F32_VCLAMP__RVV_U1V, batch_eq_1v) {
     TEST_REQUIRES_RISCV_VECTOR;
@@ -191,7 +262,7 @@
   TEST(F32_VCLAMP__RVV_U1V, qmin) {
     TEST_REQUIRES_RISCV_VECTOR;
     for (uint8_t qmin = 1; qmin < 255; qmin++) {
-      for (size_t batch_size = 1; batch_size <= 5 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 1) {
+      for (size_t batch_size = 1; batch_size <= 5 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 9) {
         VUnaryMicrokernelTester()
           .batch_size(batch_size)
           .qmin(qmin)
@@ -203,7 +274,7 @@
   TEST(F32_VCLAMP__RVV_U1V, qmax) {
     TEST_REQUIRES_RISCV_VECTOR;
     for (uint8_t qmax = 1; qmax < 255; qmax++) {
-      for (size_t batch_size = 1; batch_size <= 5 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 1) {
+      for (size_t batch_size = 1; batch_size <= 5 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 9) {
         VUnaryMicrokernelTester()
           .batch_size(batch_size)
           .qmax(qmax)
@@ -262,7 +333,7 @@
   TEST(F32_VCLAMP__RVV_U2V, qmin) {
     TEST_REQUIRES_RISCV_VECTOR;
     for (uint8_t qmin = 1; qmin < 255; qmin++) {
-      for (size_t batch_size = 1; batch_size <= 10 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 1) {
+      for (size_t batch_size = 1; batch_size <= 10 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 19) {
         VUnaryMicrokernelTester()
           .batch_size(batch_size)
           .qmin(qmin)
@@ -274,7 +345,7 @@
   TEST(F32_VCLAMP__RVV_U2V, qmax) {
     TEST_REQUIRES_RISCV_VECTOR;
     for (uint8_t qmax = 1; qmax < 255; qmax++) {
-      for (size_t batch_size = 1; batch_size <= 10 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 1) {
+      for (size_t batch_size = 1; batch_size <= 10 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 19) {
         VUnaryMicrokernelTester()
           .batch_size(batch_size)
           .qmax(qmax)
@@ -333,7 +404,7 @@
   TEST(F32_VCLAMP__RVV_U4V, qmin) {
     TEST_REQUIRES_RISCV_VECTOR;
     for (uint8_t qmin = 1; qmin < 255; qmin++) {
-      for (size_t batch_size = 1; batch_size <= 20 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 3) {
+      for (size_t batch_size = 1; batch_size <= 20 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 39) {
         VUnaryMicrokernelTester()
           .batch_size(batch_size)
           .qmin(qmin)
@@ -345,7 +416,7 @@
   TEST(F32_VCLAMP__RVV_U4V, qmax) {
     TEST_REQUIRES_RISCV_VECTOR;
     for (uint8_t qmax = 1; qmax < 255; qmax++) {
-      for (size_t batch_size = 1; batch_size <= 20 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 3) {
+      for (size_t batch_size = 1; batch_size <= 20 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 39) {
         VUnaryMicrokernelTester()
           .batch_size(batch_size)
           .qmax(qmax)
@@ -404,7 +475,7 @@
   TEST(F32_VCLAMP__RVV_U8V, qmin) {
     TEST_REQUIRES_RISCV_VECTOR;
     for (uint8_t qmin = 1; qmin < 255; qmin++) {
-      for (size_t batch_size = 1; batch_size <= 40 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 7) {
+      for (size_t batch_size = 1; batch_size <= 40 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 79) {
         VUnaryMicrokernelTester()
           .batch_size(batch_size)
           .qmin(qmin)
@@ -416,7 +487,7 @@
   TEST(F32_VCLAMP__RVV_U8V, qmax) {
     TEST_REQUIRES_RISCV_VECTOR;
     for (uint8_t qmax = 1; qmax < 255; qmax++) {
-      for (size_t batch_size = 1; batch_size <= 40 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 7) {
+      for (size_t batch_size = 1; batch_size <= 40 * xnn_init_hardware_config()->vlenb / sizeof(float); batch_size += 79) {
         VUnaryMicrokernelTester()
           .batch_size(batch_size)
           .qmax(qmax)

@@ -477,9 +477,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op1 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    16 /* channels */,
-    16 /* input stride */,
-    16 /* output stride */,
     0 /* flags */,
     &op1);
   if (status != xnn_status_success) {
@@ -514,7 +511,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op3 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    16 /* channels */, 16 /* input stride */, 16 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op3);
@@ -788,9 +784,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op16 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    96 /* channels */,
-    96 /* input stride */,
-    96 /* output stride */,
     0 /* flags */,
     &op16);
   if (status != xnn_status_success) {
@@ -825,9 +818,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op18 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    96 /* channels */,
-    96 /* input stride */,
-    96 /* output stride */,
     0 /* flags */,
     &op18);
   if (status != xnn_status_success) {
@@ -838,7 +828,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op19 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    96 /* channels */, 96 /* input stride */, 96 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op19);
@@ -957,9 +946,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op25 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    240 /* channels */,
-    240 /* input stride */,
-    240 /* output stride */,
     0 /* flags */,
     &op25);
   if (status != xnn_status_success) {
@@ -994,9 +980,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op27 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    240 /* channels */,
-    240 /* input stride */,
-    240 /* output stride */,
     0 /* flags */,
     &op27);
   if (status != xnn_status_success) {
@@ -1007,7 +990,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op28 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    240 /* channels */, 240 /* input stride */, 240 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op28);
@@ -1137,9 +1119,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op35 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    240 /* channels */,
-    240 /* input stride */,
-    240 /* output stride */,
     0 /* flags */,
     &op35);
   if (status != xnn_status_success) {
@@ -1174,9 +1153,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op37 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    240 /* channels */,
-    240 /* input stride */,
-    240 /* output stride */,
     0 /* flags */,
     &op37);
   if (status != xnn_status_success) {
@@ -1187,7 +1163,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op38 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    240 /* channels */, 240 /* input stride */, 240 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op38);
@@ -1317,9 +1292,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op45 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    120 /* channels */,
-    120 /* input stride */,
-    120 /* output stride */,
     0 /* flags */,
     &op45);
   if (status != xnn_status_success) {
@@ -1354,9 +1326,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op47 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    120 /* channels */,
-    120 /* input stride */,
-    120 /* output stride */,
     0 /* flags */,
     &op47);
   if (status != xnn_status_success) {
@@ -1367,7 +1336,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op48 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    120 /* channels */, 120 /* input stride */, 120 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op48);
@@ -1486,9 +1454,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op54 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    144 /* channels */,
-    144 /* input stride */,
-    144 /* output stride */,
     0 /* flags */,
     &op54);
   if (status != xnn_status_success) {
@@ -1523,9 +1488,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op56 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    144 /* channels */,
-    144 /* input stride */,
-    144 /* output stride */,
     0 /* flags */,
     &op56);
   if (status != xnn_status_success) {
@@ -1536,7 +1498,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op57 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    144 /* channels */, 144 /* input stride */, 144 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op57);
@@ -1666,9 +1627,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op64 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    288 /* channels */,
-    288 /* input stride */,
-    288 /* output stride */,
     0 /* flags */,
     &op64);
   if (status != xnn_status_success) {
@@ -1703,9 +1661,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op66 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    288 /* channels */,
-    288 /* input stride */,
-    288 /* output stride */,
     0 /* flags */,
     &op66);
   if (status != xnn_status_success) {
@@ -1716,7 +1671,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op67 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    288 /* channels */, 288 /* input stride */, 288 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op67);
@@ -1835,9 +1789,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op73 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    576 /* channels */,
-    576 /* input stride */,
-    576 /* output stride */,
     0 /* flags */,
     &op73);
   if (status != xnn_status_success) {
@@ -1872,9 +1823,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op75 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    576 /* channels */,
-    576 /* input stride */,
-    576 /* output stride */,
     0 /* flags */,
     &op75);
   if (status != xnn_status_success) {
@@ -1885,7 +1833,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op76 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    576 /* channels */, 576 /* input stride */, 576 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op76);
@@ -2015,9 +1962,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op83 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    576 /* channels */,
-    576 /* input stride */,
-    576 /* output stride */,
     0 /* flags */,
     &op83);
   if (status != xnn_status_success) {
@@ -2052,9 +1996,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op85 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    576 /* channels */,
-    576 /* input stride */,
-    576 /* output stride */,
     0 /* flags */,
     &op85);
   if (status != xnn_status_success) {
@@ -2065,7 +2006,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op86 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    576 /* channels */, 576 /* input stride */, 576 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op86);
@@ -2195,9 +2135,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op93 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    576 /* channels */,
-    576 /* input stride */,
-    576 /* output stride */,
     0 /* flags */,
     &op93);
   if (status != xnn_status_success) {
@@ -2208,7 +2145,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op94 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    576 /* channels */, 576 /* input stride */, 576 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op94);
@@ -2244,9 +2180,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op96 = nullptr;
   status = xnn_create_hardswish_nc_f32(
-    1024 /* channels */,
-    1024 /* input stride */,
-    1024 /* output stride */,
     0 /* flags */,
     &op96);
   if (status != xnn_status_success) {
@@ -2257,7 +2190,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op97 = nullptr;
   status = xnn_create_global_average_pooling_nwc_f32(
-    1024 /* channels */, 1024 /* input stride */, 1024 /* output stride */,
     -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
     0 /* flags */,
     &op97);
@@ -2293,9 +2225,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op99 = nullptr;
   status = xnn_create_copy_nc_x32(
-    1 /* channels */,
-    1 /* input stride */,
-    1 /* output stride */,
     0 /* flags */,
     &op99);
   if (status != xnn_status_success) {
@@ -2306,9 +2235,6 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   xnn_operator_t op100 = nullptr;
   status = xnn_create_softmax_nc_f32(
-    /*channels=*/1001,
-    /*input_stride=*/1001,
-    /*output_stride=*/1001,
     /*flags=*/0,
     &op100);
   if (status != xnn_status_success) {
@@ -2334,6 +2260,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op1,
     /*batch_size=*/12544,
+    16 /* channels */,
+    16 /* input stride */,
+    16 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #1" << std::endl;
@@ -2359,6 +2288,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op3,
     /*batch_size=*/1, 3136 /* width */,
+    16 /* channels */, 16 /* input stride */, 16 /* output stride */,
     &op3_workspace_size, &op3_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op3_workspace_size);
@@ -2536,6 +2466,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op16,
     /*batch_size=*/784,
+    96 /* channels */,
+    96 /* input stride */,
+    96 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #16" << std::endl;
@@ -2559,6 +2492,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op18,
     /*batch_size=*/196,
+    96 /* channels */,
+    96 /* input stride */,
+    96 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #18" << std::endl;
@@ -2570,6 +2506,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op19,
     /*batch_size=*/1, 196 /* width */,
+    96 /* channels */, 96 /* input stride */, 96 /* output stride */,
     &op19_workspace_size, &op19_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op19_workspace_size);
@@ -2650,6 +2587,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op25,
     /*batch_size=*/196,
+    240 /* channels */,
+    240 /* input stride */,
+    240 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #25" << std::endl;
@@ -2673,6 +2613,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op27,
     /*batch_size=*/196,
+    240 /* channels */,
+    240 /* input stride */,
+    240 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #27" << std::endl;
@@ -2684,6 +2627,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op28,
     /*batch_size=*/1, 196 /* width */,
+    240 /* channels */, 240 /* input stride */, 240 /* output stride */,
     &op28_workspace_size, &op28_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op28_workspace_size);
@@ -2777,6 +2721,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op35,
     /*batch_size=*/196,
+    240 /* channels */,
+    240 /* input stride */,
+    240 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #35" << std::endl;
@@ -2800,6 +2747,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op37,
     /*batch_size=*/196,
+    120 /* channels */,
+    120 /* input stride */,
+    120 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #37" << std::endl;
@@ -2811,6 +2761,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op38,
     /*batch_size=*/1, 196 /* width */,
+    240 /* channels */, 240 /* input stride */, 240 /* output stride */,
     &op38_workspace_size, &op38_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op38_workspace_size);
@@ -2904,6 +2855,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op45,
     /*batch_size=*/196,
+    120 /* channels */,
+    120 /* input stride */,
+    120 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #45" << std::endl;
@@ -2927,6 +2881,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op47,
     /*batch_size=*/196,
+    144 /* channels */,
+    144 /* input stride */,
+    144 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #47" << std::endl;
@@ -2938,6 +2895,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op48,
     /*batch_size=*/1, 196 /* width */,
+    120 /* channels */, 120 /* input stride */, 120 /* output stride */,
     &op48_workspace_size, &op48_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op48_workspace_size);
@@ -3018,6 +2976,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op54,
     /*batch_size=*/196,
+    144 /* channels */,
+    144 /* input stride */,
+    144 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #54" << std::endl;
@@ -3041,6 +3002,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op56,
     /*batch_size=*/196,
+    288 /* channels */,
+    288 /* input stride */,
+    288 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #56" << std::endl;
@@ -3052,6 +3016,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op57,
     /*batch_size=*/1, 196 /* width */,
+    144 /* channels */, 144 /* input stride */, 144 /* output stride */,
     &op57_workspace_size, &op57_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op57_workspace_size);
@@ -3145,6 +3110,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op64,
     /*batch_size=*/196,
+    288 /* channels */,
+    288 /* input stride */,
+    288 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #64" << std::endl;
@@ -3168,6 +3136,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op66,
     /*batch_size=*/49,
+    576 /* channels */,
+    576 /* input stride */,
+    576 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #66" << std::endl;
@@ -3179,6 +3150,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op67,
     /*batch_size=*/1, 49 /* width */,
+    288 /* channels */, 288 /* input stride */, 288 /* output stride */,
     &op67_workspace_size, &op67_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op67_workspace_size);
@@ -3259,6 +3231,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op73,
     /*batch_size=*/49,
+    576 /* channels */,
+    576 /* input stride */,
+    576 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #73" << std::endl;
@@ -3282,6 +3257,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op75,
     /*batch_size=*/49,
+    576 /* channels */,
+    576 /* input stride */,
+    576 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #75" << std::endl;
@@ -3293,6 +3271,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op76,
     /*batch_size=*/1, 49 /* width */,
+    576 /* channels */, 576 /* input stride */, 576 /* output stride */,
     &op76_workspace_size, &op76_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op76_workspace_size);
@@ -3386,6 +3365,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op83,
     /*batch_size=*/49,
+    576 /* channels */,
+    576 /* input stride */,
+    576 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #83" << std::endl;
@@ -3409,6 +3391,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op85,
     /*batch_size=*/49,
+    576 /* channels */,
+    576 /* input stride */,
+    576 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #85" << std::endl;
@@ -3420,6 +3405,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op86,
     /*batch_size=*/1, 49 /* width */,
+    576 /* channels */, 576 /* input stride */, 576 /* output stride */,
     &op86_workspace_size, &op86_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op86_workspace_size);
@@ -3513,6 +3499,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op93,
     /*batch_size=*/49,
+    1024 /* channels */,
+    1024 /* input stride */,
+    1024 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #93" << std::endl;
@@ -3524,6 +3513,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op94,
     /*batch_size=*/1, 49 /* width */,
+    576 /* channels */, 576 /* input stride */, 576 /* output stride */,
     &op94_workspace_size, &op94_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op94_workspace_size);
@@ -3549,6 +3539,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_hardswish_nc_f32(
     op96,
     /*batch_size=*/1,
+    1024 /* channels */,
+    1024 /* input stride */,
+    1024 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #96" << std::endl;
@@ -3560,6 +3553,7 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_f32(
     op97,
     /*batch_size=*/1, 1 /* width */,
+    1024 /* channels */, 1024 /* input stride */, 1024 /* output stride */,
     &op97_workspace_size, &op97_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op97_workspace_size);
@@ -3585,6 +3579,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
   status = xnn_reshape_copy_nc_x32(
     op99,
     /*batch_size=*/1001,
+    1 /* channels */,
+    1 /* input stride */,
+    1 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #99" << std::endl;
@@ -3593,6 +3590,9 @@ ExecutionPlan FP32MobileNetV3Small(pthreadpool_t threadpool) {
 
   status = xnn_reshape_softmax_nc_f32(
     op100,
+    /*channels=*/1001,
+    /*input_stride=*/1001,
+    /*output_stride=*/1001,
     /*batch_size=*/1,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {

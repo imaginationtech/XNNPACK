@@ -48,7 +48,9 @@ _ISA_TO_MACRO_MAP = {
   "neondotfp16arith": "XNN_ENABLE_ARM_DOTPROD && XNN_ENABLE_ARM_FP16_VECTOR",
   "neoni8mm": "XNN_ENABLE_ARM_I8MM",
   "rvv": "XNN_ENABLE_RISCV_VECTOR",
+  "rvvfp16arith": "XNN_ENABLE_RISCV_FP16_VECTOR",
   "avxvnni": "XNN_ENABLE_AVXVNNI",
+  "avx512vnnigfni": "XNN_ENABLE_AVX512VNNIGFNI",
 }
 
 _ISA_TO_ARCH_MAP = {
@@ -76,8 +78,10 @@ _ISA_TO_ARCH_MAP = {
   "avx512skx": ["x86-32", "x86-64"],
   "avx512vbmi": ["x86-32", "x86-64"],
   "avx512vnni": ["x86-32", "x86-64"],
+  "avx512vnnigfni": ["x86-32", "x86-64"],
   "avxvnni": ["x86-32", "x86-64"],
   "rvv": ["riscv"],
+  "rvvfp16arith": ["riscv"],
   "wasm32": ["wasm", "wasmsimd"],
   "wasm": ["wasm", "wasmsimd", "wasmrelaxedsimd"],
   "wasmsimd": ["wasmsimd", "wasmrelaxedsimd"],
@@ -110,8 +114,10 @@ _ISA_TO_UTILCHECK_MAP = {
   "avx512skx": "CheckAVX512SKX",
   "avx512vbmi": "CheckAVX512VBMI",
   "avx512vnni": "CheckAVX512VNNI",
+  "avx512vnnigfni": "CheckAVX512VNNIGFNI",
   "avxvnni": "CheckAVXVNNI",
   "rvv": "CheckRVV",
+  "rvvfp16arith": "CheckRVVFP16ARITH",
   "wasmpshufb": "CheckWAsmPSHUFB",
   "wasmsdot": "CheckWAsmSDOT",
   "wasmblendvps": "CheckWAsmBLENDVPS",
@@ -142,8 +148,10 @@ _ISA_TO_CHECK_MAP = {
   "avx512skx": "TEST_REQUIRES_X86_AVX512SKX",
   "avx512vbmi": "TEST_REQUIRES_X86_AVX512VBMI",
   "avx512vnni": "TEST_REQUIRES_X86_AVX512VNNI",
+  "avx512vnnigfni": "TEST_REQUIRES_X86_AVX512VNNIGFNI",
   "avxvnni": "TEST_REQUIRES_X86_AVXVNNI",
   "rvv": "TEST_REQUIRES_RISCV_VECTOR",
+  "rvvfp16arith": "TEST_REQUIRES_RISCV_VECTOR_FP16_ARITH",
   "wasmpshufb": "TEST_REQUIRES_WASM_PSHUFB",
   "wasmsdot": "TEST_REQUIRES_WASM_SDOT",
   "wasmblendvps": "TEST_REQUIRES_WASM_BLENDVPS",
@@ -212,6 +220,7 @@ _ISA_HIERARCHY = [
   "avx512skx",
   "avx512vbmi",
   "avx512vnni",
+  "avx512vnnigfni",
   "avxvnni",
   "armsimd32",
   "neon",
@@ -219,6 +228,11 @@ _ISA_HIERARCHY = [
   "neondot",
   "neondotfp16",
   "neoni8mm",
+  "wasm",
+  "wasmsimd",
+  "wasmrelaxedsimd",
+  "rvv",
+  "rvvfp16",
 ]
 
 _ISA_HIERARCHY_MAP = {isa: v for v, isa in enumerate(_ISA_HIERARCHY)}

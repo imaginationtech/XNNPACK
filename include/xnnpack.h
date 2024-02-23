@@ -85,6 +85,9 @@ extern "C" {
 /// Use transient indirection buffer to reduce memory footprint
 #define XNN_FLAG_TRANSIENT_INDIRECTION_BUFFER 0x00000020
 
+/// Retain reduced dimensions with length 1.
+#define XNN_FLAG_KEEP_DIMS 0x00000040
+
 /// The number of entries in an array of xnn_dynamic_quantization_params that XNNPACK may read beyond array bounds.
 /// The caller must allocate at least this many extra xnn_dynamic_quantization_params before passing the array to XNNPACK.
 ///
@@ -106,6 +109,7 @@ enum xnn_status {
   xnn_status_unsupported_parameter = 4,
   xnn_status_unsupported_hardware = 5,
   xnn_status_out_of_memory = 6,
+  xnn_status_reallocation_required = 7,
 };
 
 struct xnn_allocator {
@@ -580,7 +584,8 @@ enum xnn_status xnn_define_depth_to_space(
 ///                   defined in the @a subgraph. Averaging is performed across the second-innermost dimension.
 /// @param output_id - Value ID for the output tensor. The output tensor must be a dense tensor with 2 or more
 ///                    dimensions defined in the @a subgraph.
-/// @param flags - binary features of the 1D Global Average Pooling Node. No supported flags are currently defined.
+/// @param flags - binary features of the 1D Global Average Pooling Node. The only currently supported value is
+///                XNN_FLAG_KEEP_DIMS.
 enum xnn_status xnn_define_global_average_pooling_1d(
   xnn_subgraph_t subgraph,
   float output_min,
@@ -599,7 +604,8 @@ enum xnn_status xnn_define_global_average_pooling_1d(
 ///                   dimensions.
 /// @param output_id - Value ID for the output tensor. The output tensor must be a dense tensor with 3 or more
 ///                    dimensions defined in the @a subgraph.
-/// @param flags - binary features of the 2D Global Average Pooling Node. No supported flags are currently defined.
+/// @param flags - binary features of the 2D Global Average Pooling Node. The only currently supported value is
+///                XNN_FLAG_KEEP_DIMS.
 enum xnn_status xnn_define_global_average_pooling_2d(
   xnn_subgraph_t subgraph,
   float output_min,
@@ -617,7 +623,8 @@ enum xnn_status xnn_define_global_average_pooling_2d(
 ///                   defined in the @a subgraph. Averaging is performed across the second-innermost dimension.
 /// @param output_id - Value ID for the output tensor. The output tensor must be a dense tensor with 2 or more
 ///                    dimensions defined in the @a subgraph.
-/// @param flags - binary features of the 1D Global Sum Pooling Node. No supported flags are currently defined.
+/// @param flags - binary features of the 1D Global Sum Pooling Node. The only currently supported value is
+///                XNN_FLAG_KEEP_DIMS.
 enum xnn_status xnn_define_global_sum_pooling_1d(
   xnn_subgraph_t subgraph,
   float output_min,
@@ -636,7 +643,8 @@ enum xnn_status xnn_define_global_sum_pooling_1d(
 ///                   dimensions.
 /// @param output_id - Value ID for the output tensor. The output tensor must be a dense tensor with 3 or more
 ///                    dimensions defined in the @a subgraph.
-/// @param flags - binary features of the 2D Global Sum Pooling Node. No supported flags are currently defined.
+/// @param flags - binary features of the 2D Global Sum Pooling Node. The only currently supported value is
+///                XNN_FLAG_KEEP_DIMS.
 enum xnn_status xnn_define_global_sum_pooling_2d(
   xnn_subgraph_t subgraph,
   float output_min,
@@ -1152,8 +1160,10 @@ enum xnn_status xnn_define_static_constant_pad(
 /// @param input_id - Value ID for the input tensor. The input tensor must be a dense tensor with at least
 ///                   @a num_reduction_axes dimensions defined in the @a subgraph.
 /// @param output_id - Value ID for the output tensor. The output tensor must be a dense tensor defined in the
-///                    @a subgraph with @a num_reduction_axes fewer dimensions than the input tensor.
-/// @param flags - binary features of the Mean Node. No supported flags are currently defined.
+///                    @a subgraph with @a num_reduction_axes fewer dimensions than the input tensor (if
+///                    XNN_FLAG_KEEP_DIMS is not specified), or has same dimension rank but the dimension at
+///                    @a reduction_axes reduced to 1 (if XNN_FLAG_KEEP_DIMS is specified).
+/// @param flags - binary features of the Mean Node. The only currently supported value is XNN_FLAG_KEEP_DIMS
 enum xnn_status xnn_define_static_mean(
   xnn_subgraph_t subgraph,
   size_t num_reduction_axes,
@@ -1243,6 +1253,17 @@ enum xnn_status xnn_define_concatenate4(
   uint32_t input2_id,
   uint32_t input3_id,
   uint32_t input4_id,
+  uint32_t output_id,
+  uint32_t flags);
+
+enum xnn_status xnn_define_concatenate5(
+  xnn_subgraph_t subgraph,
+  size_t axis,
+  uint32_t input1_id,
+  uint32_t input2_id,
+  uint32_t input3_id,
+  uint32_t input4_id,
+  uint32_t input5_id,
   uint32_t output_id,
   uint32_t flags);
 
@@ -1363,6 +1384,24 @@ enum xnn_status xnn_define_static_reshape(
   uint32_t input_id,
   uint32_t output_id,
   uint32_t flags);
+
+/// Define a Node that reshapes a tensor to two dimensions, retaining the
+/// trailing dimension, and add it to a Subgraph.
+///
+/// This operator is experimental.
+///
+/// @param subgraph - a Subgraph object that will own the created Node.
+/// @param input_id - Value ID for the input tensor. The input tensor must be
+///                   defined in the @a subgraph.
+/// @param output_id - Value ID for the output tensor. The output tensor must be
+///                    defined in the @a subgraph, and its
+///                    size must match the shape of the input tensor with
+///                    padding.
+/// @param flags - binary features of the Reshape Node. No supported flags are
+///                currently defined.
+enum xnn_status xnn_define_reshape_2d(xnn_subgraph_t subgraph,
+                                      uint32_t input_id, uint32_t output_id,
+                                      uint32_t flags);
 
 /// Define a 2D Resize Bilinear Node with static output height & width specification and add it to a Subgraph.
 ///
@@ -1701,19 +1740,6 @@ enum xnn_status xnn_define_tanh(
 /// Code cache is a cache for JIT generated code.
 typedef struct xnn_code_cache* xnn_code_cache_t;
 
-/// Weights cache is a cache for packed weights. It can be reused between runtimes.
-typedef struct xnn_weights_cache* xnn_weights_cache_t;
-
-enum xnn_status xnn_create_weights_cache(xnn_weights_cache_t* weights_cache_out);
-
-/// Create a weights cache object specifying the initial size of weights cache (in bytes).
-/// @size - initial capacity of the weights cache (in bytes), i.e. it can hold size bytes without growing.
-/// @param weights_cache_out - pointer to the variable that will be initialized to a handle to the weights cache object
-///                            upon successful return. Once created, the weights cache object can be shared between
-///                            different Runtime objects.
-enum xnn_status xnn_create_weights_cache_with_size(size_t size, xnn_weights_cache_t* weights_cache_out);
-
-
 /// Weights cache can be finalized in these ways:
 enum xnn_weights_cache_finalization_kind {
   /// Weights cache is finalized, no insert operations into the weights cache is allowed, even if the "inserted"
@@ -1724,6 +1750,72 @@ enum xnn_weights_cache_finalization_kind {
   /// if the weights are already in the cache, and errors on inserting uncached weights. There is memory overhead.
   xnn_weights_cache_finalization_kind_soft,
 };
+
+/// A combination of multiple factors to uniquely locate the weights cache.
+struct xnn_weights_cache_look_up_key {
+  /// The unique seed for each ukernel. It is guaranteed that each ukernel provides
+  /// a consistent and identical seed.
+  uint32_t seed;
+  /// Pointer to the original kernel.
+  const void* kernel;
+  /// Pointer to the original bias, could be NULL.
+  const void* bias;
+};
+
+/// A group of function pointers to manage weights cache. All functions may be
+/// called on multi threads.
+struct xnn_weights_cache_provider {
+  /// User-specified pointer that will be passed as-is to all functions in this
+  /// structure.
+  void* context;
+
+  /// Looks up the tuple of {cache_key, kernel, bias} in the cache. If it is found,
+  /// returns the offset to the found entry for reuse. Otherwise, returns SIZE_MAX.
+  /// @param context - The user-specified pointer from xnn_weights_cache_provider structure.
+  /// @param cache_key - The key used to locate the weights cache entry.
+  size_t (*look_up)(void* context, const struct xnn_weights_cache_look_up_key* cache_key);
+
+  /// Ensures that cache has enough space for `n` bytes. Returns the address to
+  /// store weight cache. Returns NULL if fails to reserve space.
+  /// @param context - The user-specified pointer from xnn_weights_cache_provider structure.
+  /// @param n - size to be reserved.
+  void* (*reserve_space)(void* context, size_t n);
+
+  /// Looks up packed weights at `ptr` in the cache. If it is found, reuse it.
+  /// Otherwise, it is added to the cache. Returns the offset to the cache.
+  /// @param context - The user-specified pointer from xnn_weights_cache_provider structure.
+  /// @param cache_key - The key used to locate the weights cache entry.
+  /// @param ptr - pointer pointing to the packed weight.
+  /// @param size - size of the packed weight.
+  size_t (*look_up_or_insert)(void* context, const struct xnn_weights_cache_look_up_key* cache_key, void* ptr, size_t size);
+
+  /// Returns whether the cache is finalized.
+  /// @param context - The user-specified pointer from xnn_weights_cache_provider structure.
+  bool (*is_finalized)(void* context);
+
+  /// Returns the absolute pointer corresponding to `offset`, where the offset is returned from
+  /// `look_up` or `get_or_insert`. This function must be called after finalize.
+  /// @param context - The user-specified pointer from xnn_weights_cache_provider structure.
+  /// @param offset - offset to the start of internal buffer
+  void* (*offset_to_addr)(void* context, size_t offset);
+
+  /// Destroy a weights cache object, as well as memory used for the cache.
+  /// @param context - The user-specified pointer from xnn_weights_cache_provider structure.
+  enum xnn_status (*delete_cache)(void* context);
+};
+
+/// Weights cache is a cache for packed weights. It can be reused between runtimes.
+typedef struct xnn_weights_cache_provider* xnn_weights_cache_t;
+
+/// Create a weights cache object specifying the initial size of weights cache (in bytes).
+///
+/// @param[in] size - initial capacity of the weights cache (in bytes), i.e. it can hold size bytes without growing.
+/// @param weights_cache_out - pointer to the variable that will be initialized to a handle to the weights cache provider
+///                            upon successful return. Once created, the weights cache provider can be shared between
+///                            different Runtime objects.
+enum xnn_status xnn_create_weights_cache_with_size(size_t size, xnn_weights_cache_t* weights_cache_out);
+
+enum xnn_status xnn_create_weights_cache(xnn_weights_cache_t* weights_cache_out);
 
 /// Finalizes the weights cache. The kind of finalization is specified by `finalization_kind`.
 /// @param weights_cache - the weights cache object to finalize.
@@ -1828,7 +1920,46 @@ struct xnn_external_value {
   void* data;
 };
 
-/// Setup data pointers for external inputs and outputs in a Runtime object.
+/// Reshape an external value.
+///
+/// @param external_id - external ID for the Value. The ID must be within the range of reversed Value IDs specified on
+///                      the Subgraph creation. If the external ID is XNN_INVALID_VALUE_ID, an internal ID will be
+///                      created for the Value.
+/// @param num_dims - number of dimensions in the shape.
+/// @param dims - pointer to an array of @a num_dims shape dimensions. If num_dims is 0, this pointer can be NULL.
+///               XNNPACK does not keep any pointers to this array after the function returns.
+enum xnn_status xnn_reshape_external_value(
+  xnn_runtime_t runtime,
+  uint32_t external_id,
+  size_t num_dims,
+  const size_t* dims);
+
+/// Get the external value shape.
+///
+/// @param external_id - external ID for the Value. The ID must be within the range of reversed Value IDs specified on
+///                      the Subgraph creation. The external ID can not be XNN_INVALID_VALUE_ID.
+/// @param num_dims -  A valid pointer into which the number of dimensions in the shape will be written. It can not be larger than XNN_MAX_TENSOR_DIMS.
+/// @param dims - pointer to an array of @a num_dims shape dimensions. This pointer can't be NULL. It must be large enough to hold
+///               at least @a num_dims elements. XNNPACK does not keep any pointers to this array after the function returns.
+enum xnn_status xnn_get_external_value_shape(
+  xnn_runtime_t runtime,
+  uint32_t external_id,
+  size_t* num_dims,
+  size_t* dims);
+
+/// Reshape the XNNPACK runtime.
+///
+/// Propgates the shapes of input tensors through the graph to determine the shapes of intermediate and output tensors.
+/// Memory is allocated if required. Output tensor shapes are returned by xnn_get_external_value_shape.
+///
+/// @param runtime - a Runtime object created with @ref xnn_create_runtime or @ref xnn_create_runtime_v2.
+enum xnn_status xnn_reshape_runtime(
+  xnn_runtime_t runtime);
+
+/// Deprecated. Use xnn_reshape_runtime and xnn_setup_runtime_v2.
+///
+/// Setup data pointers for external inputs and outputs in a Runtime object and
+/// allocate memory.
 ///
 /// @param runtime - a Runtime object created with @ref xnn_create_runtime or @ref xnn_create_runtime_v2.
 /// @param num_external_values - the number of external inputs and outputs specified in this call. This number must
@@ -1836,6 +1967,19 @@ struct xnn_external_value {
 ///                              inputs and outputs in the runtime must be specified in one call.
 /// @param external_values - array with location information for all external inputs and outputs in the runtime.
 enum xnn_status xnn_setup_runtime(
+  xnn_runtime_t runtime,
+  size_t num_external_values,
+  const struct xnn_external_value* external_values);
+
+/// Setup data pointers for external inputs and outputs in a Runtime object.
+/// Should be called after xnn_reshape_runtime.
+///
+/// @param runtime - a Runtime object created with @ref xnn_create_runtime or @ref xnn_create_runtime_v2.
+/// @param num_external_values - the number of external inputs and outputs specified in this call. This number must
+///                              match the number of external inputs and outputs in the runtime, i.e. all external
+///                              inputs and outputs in the runtime must be specified in one call.
+/// @param external_values - array with location information for all external inputs and outputs in the runtime.
+enum xnn_status xnn_setup_runtime_v2(
   xnn_runtime_t runtime,
   size_t num_external_values,
   const struct xnn_external_value* external_values);
@@ -1871,15 +2015,15 @@ enum xnn_status xnn_delete_operator(
 /// data layout and type. We also group create, reshape, setup (and optionally run) functions of each operator together.
 
 enum xnn_status xnn_create_abs_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* abs_op_out);
 
 enum xnn_status xnn_reshape_abs_nc_f16(
   xnn_operator_t abs_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_abs_nc_f16(
@@ -1888,15 +2032,15 @@ enum xnn_status xnn_setup_abs_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_abs_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* abs_op_out);
 
 enum xnn_status xnn_reshape_abs_nc_f32(
   xnn_operator_t abs_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_abs_nc_f32(
@@ -2064,9 +2208,6 @@ enum xnn_status xnn_create_argmax_pooling2d_nhwc_f32(
   uint32_t input_padding_left,
   uint32_t pooling_height,
   uint32_t pooling_width,
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
   uint32_t flags,
   xnn_operator_t* argmax_pooling_op_out);
 
@@ -2075,8 +2216,13 @@ enum xnn_status xnn_reshape_argmax_pooling2d_nhwc_f32(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
+  size_t* output_height_out,
+  size_t* output_width_out,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_argmax_pooling2d_nhwc_f32(
@@ -2095,9 +2241,6 @@ enum xnn_status xnn_create_average_pooling2d_nhwc_f16(
   uint32_t pooling_width,
   uint32_t stride_height,
   uint32_t stride_width,
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -2108,6 +2251,9 @@ enum xnn_status xnn_reshape_average_pooling2d_nhwc_f16(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   size_t* output_height_out,
@@ -2129,9 +2275,6 @@ enum xnn_status xnn_create_average_pooling2d_nhwc_f32(
   uint32_t pooling_width,
   uint32_t stride_height,
   uint32_t stride_width,
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -2142,6 +2285,9 @@ enum xnn_status xnn_reshape_average_pooling2d_nhwc_f32(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   size_t* output_height_out,
@@ -2163,9 +2309,6 @@ enum xnn_status xnn_create_average_pooling2d_nhwc_qu8(
   uint32_t pooling_width,
   uint32_t stride_height,
   uint32_t stride_width,
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
   uint8_t input_zero_point,
   float input_scale,
   uint8_t output_zero_point,
@@ -2180,6 +2323,9 @@ enum xnn_status xnn_reshape_average_pooling2d_nhwc_qu8(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   size_t* output_height_out,
@@ -2193,15 +2339,15 @@ enum xnn_status xnn_setup_average_pooling2d_nhwc_qu8(
   uint8_t* output);
 
 enum xnn_status xnn_create_bankers_rounding_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* rounding_op_out);
 
 enum xnn_status xnn_reshape_bankers_rounding_nc_f16(
   xnn_operator_t rounding_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_bankers_rounding_nc_f16(
@@ -2210,15 +2356,15 @@ enum xnn_status xnn_setup_bankers_rounding_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_bankers_rounding_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* rounding_op_out);
 
 enum xnn_status xnn_reshape_bankers_rounding_nc_f32(
   xnn_operator_t rounding_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_bankers_rounding_nc_f32(
@@ -2279,15 +2425,15 @@ enum xnn_status xnn_setup_batch_matrix_multiply_nc_f32(
   float* output);
 
 enum xnn_status xnn_create_ceiling_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* ceiling_op_out);
 
 enum xnn_status xnn_reshape_ceiling_nc_f16(
   xnn_operator_t ceiling_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_ceiling_nc_f16(
@@ -2296,9 +2442,6 @@ enum xnn_status xnn_setup_ceiling_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_ceiling_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* ceiling_op_out);
 
@@ -2315,6 +2458,9 @@ enum xnn_status xnn_run_ceiling_nc_f32(
 enum xnn_status xnn_reshape_ceiling_nc_f32(
   xnn_operator_t ceiling_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_ceiling_nc_f32(
@@ -2359,9 +2505,6 @@ enum xnn_status xnn_setup_channel_shuffle_nc_x32(
   void* output);
 
 enum xnn_status xnn_create_clamp_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -2370,6 +2513,9 @@ enum xnn_status xnn_create_clamp_nc_f16(
 enum xnn_status xnn_reshape_clamp_nc_f16(
   xnn_operator_t clamp_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_clamp_nc_f16(
@@ -2378,9 +2524,6 @@ enum xnn_status xnn_setup_clamp_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_clamp_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -2389,6 +2532,9 @@ enum xnn_status xnn_create_clamp_nc_f32(
 enum xnn_status xnn_reshape_clamp_nc_f32(
   xnn_operator_t clamp_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_clamp_nc_f32(
@@ -2409,9 +2555,6 @@ enum xnn_status xnn_run_clamp_nc_f32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_clamp_nc_s8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   int8_t output_min,
   int8_t output_max,
   uint32_t flags,
@@ -2420,6 +2563,9 @@ enum xnn_status xnn_create_clamp_nc_s8(
 enum xnn_status xnn_reshape_clamp_nc_s8(
   xnn_operator_t clamp_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_clamp_nc_s8(
@@ -2428,9 +2574,6 @@ enum xnn_status xnn_setup_clamp_nc_s8(
   int8_t* output);
 
 enum xnn_status xnn_create_clamp_nc_u8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint8_t output_min,
   uint8_t output_max,
   uint32_t flags,
@@ -2439,6 +2582,9 @@ enum xnn_status xnn_create_clamp_nc_u8(
 enum xnn_status xnn_reshape_clamp_nc_u8(
   xnn_operator_t clamp_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_clamp_nc_u8(
@@ -2534,15 +2680,15 @@ enum xnn_status xnn_run_constant_pad_nd_x32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_convert_nc_f16_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* convert_op_out);
 
 enum xnn_status xnn_reshape_convert_nc_f16_f32(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_convert_nc_f16_f32(
@@ -2561,15 +2707,15 @@ enum xnn_status xnn_run_convert_nc_f16_f32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_convert_nc_f16_qd8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* convert_op_out);
 
 enum xnn_status xnn_reshape_convert_nc_f16_qd8(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 // quantization_params must be padded with at least XNN_EXTRA_QUANTIZATION_PARAMS entries.
@@ -2580,15 +2726,15 @@ enum xnn_status xnn_setup_convert_nc_f16_qd8(
   struct xnn_dynamic_quantization_params* quantization_params);
 
 enum xnn_status xnn_create_convert_nc_f32_qd8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* convert_op_out);
 
 enum xnn_status xnn_reshape_convert_nc_f32_qd8(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 // quantization_params must be padded with at least XNN_EXTRA_QUANTIZATION_PARAMS entries.
@@ -2599,15 +2745,15 @@ enum xnn_status xnn_setup_convert_nc_f32_qd8(
   struct xnn_dynamic_quantization_params* quantization_params);
 
 enum xnn_status xnn_create_convert_nc_f32_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* convert_op_out);
 
 enum xnn_status xnn_reshape_convert_nc_f32_f16(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_convert_nc_f32_f16(
@@ -2626,9 +2772,6 @@ enum xnn_status xnn_run_convert_nc_f32_f16(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_convert_nc_f32_qs8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float output_scale,
   int8_t output_zero_point,
   int8_t output_min,
@@ -2639,6 +2782,9 @@ enum xnn_status xnn_create_convert_nc_f32_qs8(
 enum xnn_status xnn_reshape_convert_nc_f32_qs8(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_convert_nc_f32_qs8(
@@ -2659,9 +2805,6 @@ enum xnn_status xnn_run_convert_nc_f32_qs8(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_convert_nc_f32_qu8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float output_scale,
   uint8_t output_zero_point,
   uint8_t output_min,
@@ -2672,6 +2815,9 @@ enum xnn_status xnn_create_convert_nc_f32_qu8(
 enum xnn_status xnn_reshape_convert_nc_f32_qu8(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_convert_nc_f32_qu8(
@@ -2692,9 +2838,6 @@ enum xnn_status xnn_run_convert_nc_f32_qu8(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_convert_nc_qs8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float input_scale,
   int8_t input_zero_point,
   float output_scale,
@@ -2705,6 +2848,9 @@ enum xnn_status xnn_create_convert_nc_qs8(
 enum xnn_status xnn_reshape_convert_nc_qs8(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_convert_nc_qs8(
@@ -2712,10 +2858,26 @@ enum xnn_status xnn_setup_convert_nc_qs8(
   const int8_t* input,
   int8_t* output);
 
-enum xnn_status xnn_create_convert_nc_qs8_f32(
+enum xnn_status xnn_create_convert_nc_qs8_f16(
+  float input_scale,
+  int8_t input_zero_point,
+  uint32_t flags,
+  xnn_operator_t* convert_op_out);
+
+enum xnn_status xnn_reshape_convert_nc_qs8_f16(
+  xnn_operator_t convert_op,
+  size_t batch_size,
   size_t channels,
   size_t input_stride,
   size_t output_stride,
+  pthreadpool_t threadpool);
+
+enum xnn_status xnn_setup_convert_nc_qs8_f16(
+  xnn_operator_t convert_op,
+  const int8_t* input,
+  void* output);
+
+enum xnn_status xnn_create_convert_nc_qs8_f32(
   float input_scale,
   int8_t input_zero_point,
   uint32_t flags,
@@ -2724,6 +2886,9 @@ enum xnn_status xnn_create_convert_nc_qs8_f32(
 enum xnn_status xnn_reshape_convert_nc_qs8_f32(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_convert_nc_qs8_f32(
@@ -2744,9 +2909,6 @@ enum xnn_status xnn_run_convert_nc_qs8_f32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_convert_nc_qs16_qs8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float input_scale,
   float output_scale,
   int8_t output_zero_point,
@@ -2756,6 +2918,9 @@ enum xnn_status xnn_create_convert_nc_qs16_qs8(
 enum xnn_status xnn_reshape_convert_nc_qs16_qs8(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_convert_nc_qs16_qs8(
@@ -2777,9 +2942,6 @@ enum xnn_status xnn_run_convert_nc_qs16_qs8(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_convert_nc_qu8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float input_scale,
   uint8_t input_zero_point,
   float output_scale,
@@ -2790,6 +2952,9 @@ enum xnn_status xnn_create_convert_nc_qu8(
 enum xnn_status xnn_reshape_convert_nc_qu8(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_convert_nc_qu8(
@@ -2798,9 +2963,6 @@ enum xnn_status xnn_setup_convert_nc_qu8(
   uint8_t* output);
 
 enum xnn_status xnn_create_convert_nc_qu8_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float input_scale,
   uint8_t input_zero_point,
   uint32_t flags,
@@ -2809,6 +2971,9 @@ enum xnn_status xnn_create_convert_nc_qu8_f32(
 enum xnn_status xnn_reshape_convert_nc_qu8_f32(
   xnn_operator_t convert_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_convert_nc_qu8_f32(
@@ -3023,6 +3188,18 @@ enum xnn_status xnn_setup_convolution2d_nhwc_f32(
   const float* input,
   float* output);
 
+enum xnn_status xnn_create_convolution2d_nhwc_qd8_f16_qc8w(
+    uint32_t input_padding_top, uint32_t input_padding_right,
+    uint32_t input_padding_bottom, uint32_t input_padding_left,
+    uint32_t kernel_height, uint32_t kernel_width, uint32_t subsampling_height,
+    uint32_t subsampling_width, uint32_t dilation_height,
+    uint32_t dilation_width, uint32_t groups, size_t group_input_channels,
+    size_t group_output_channels, size_t input_channel_stride,
+    size_t output_channel_stride, const float* kernel_scale,
+    const int8_t* kernel, const float* bias, float output_min, float output_max,
+    uint32_t flags, xnn_code_cache_t code_cache,
+    xnn_weights_cache_t weights_cache, xnn_operator_t* convolution_op_out);
+
 enum xnn_status xnn_create_convolution2d_nhwc_qd8_f32_qc8w(
     uint32_t input_padding_top, uint32_t input_padding_right,
     uint32_t input_padding_bottom, uint32_t input_padding_left,
@@ -3065,6 +3242,12 @@ enum xnn_status xnn_create_convolution2d_nhwc_qs8(
   xnn_weights_cache_t weights_cache,
   xnn_operator_t* convolution_op_out);
 
+enum xnn_status xnn_reshape_convolution2d_nhwc_qd8_f16_qc8w(
+    xnn_operator_t convolution_op, size_t batch_size, size_t input_height,
+    size_t input_width, size_t* workspace_size, size_t* workspace_alignment,
+    size_t* output_height_out, size_t* output_width_out,
+    pthreadpool_t threadpool);
+
 enum xnn_status xnn_reshape_convolution2d_nhwc_qd8_f32_qc8w(
     xnn_operator_t convolution_op, size_t batch_size, size_t input_height,
     size_t input_width, size_t* workspace_size, size_t* workspace_alignment,
@@ -3081,6 +3264,11 @@ enum xnn_status xnn_reshape_convolution2d_nhwc_qs8(
   size_t* output_height_out,
   size_t* output_width_out,
   pthreadpool_t threadpool);
+
+enum xnn_status xnn_setup_convolution2d_nhwc_qd8_f16_qc8w(
+    xnn_operator_t convolution_op, void* workspace, const int8_t* input,
+    void* output,
+    const struct xnn_dynamic_quantization_params* quantization_params);
 
 enum xnn_status xnn_setup_convolution2d_nhwc_qd8_f32_qc8w(
     xnn_operator_t convolution_op, void* workspace, const int8_t* input,
@@ -3189,15 +3377,15 @@ enum xnn_status xnn_setup_convolution2d_nhwc_qu8(
   uint8_t* output);
 
 enum xnn_status xnn_create_copy_nc_x8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* copy_op_out);
 
 enum xnn_status xnn_reshape_copy_nc_x8(
   xnn_operator_t copy_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_copy_nc_x8(
@@ -3206,15 +3394,15 @@ enum xnn_status xnn_setup_copy_nc_x8(
   void* output);
 
 enum xnn_status xnn_create_copy_nc_x16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* copy_op_out);
 
 enum xnn_status xnn_reshape_copy_nc_x16(
   xnn_operator_t copy_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_copy_nc_x16(
@@ -3223,15 +3411,15 @@ enum xnn_status xnn_setup_copy_nc_x16(
   void* output);
 
 enum xnn_status xnn_create_copy_nc_x32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* copy_op_out);
 
 enum xnn_status xnn_reshape_copy_nc_x32(
   xnn_operator_t copy_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_copy_nc_x32(
@@ -3425,9 +3613,6 @@ enum xnn_status xnn_setup_deconvolution2d_nhwc_qu8(
   uint8_t* output);
 
 enum xnn_status xnn_create_depth_to_space_nchw2nhwc_x16(
-  size_t output_channels,
-  size_t input_channel_stride,
-  size_t output_channel_stride,
   uint32_t block_size,
   uint32_t flags,
   xnn_operator_t* depth_to_space_op_out);
@@ -3437,6 +3622,7 @@ enum xnn_status xnn_reshape_depth_to_space_nchw2nhwc_x16(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t input_channels,
   size_t* output_height_out,
   size_t* output_width_out,
   size_t* output_channels_out,
@@ -3448,9 +3634,6 @@ enum xnn_status xnn_setup_depth_to_space_nchw2nhwc_x16(
   void* output);
 
 enum xnn_status xnn_create_depth_to_space_nchw2nhwc_x32(
-  size_t output_channels,
-  size_t input_channel_stride,
-  size_t output_channel_stride,
   uint32_t block_size,
   uint32_t flags,
   xnn_operator_t* depth_to_space_op_out);
@@ -3460,6 +3643,7 @@ enum xnn_status xnn_reshape_depth_to_space_nchw2nhwc_x32(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t input_channels,
   size_t* output_height_out,
   size_t* output_width_out,
   size_t* output_channels_out,
@@ -3471,9 +3655,6 @@ enum xnn_status xnn_setup_depth_to_space_nchw2nhwc_x32(
   void* output);
 
 enum xnn_status xnn_create_depth_to_space_nhwc_x8(
-  size_t output_channels,
-  size_t input_channel_stride,
-  size_t output_channel_stride,
   uint32_t block_size,
   uint32_t flags,
   xnn_operator_t* depth_to_space_op_out);
@@ -3483,6 +3664,7 @@ enum xnn_status xnn_reshape_depth_to_space_nhwc_x8(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t input_channels,
   size_t* output_height_out,
   size_t* output_width_out,
   size_t* output_channels_out,
@@ -3494,9 +3676,6 @@ enum xnn_status xnn_setup_depth_to_space_nhwc_x8(
   void* output);
 
 enum xnn_status xnn_create_depth_to_space_nhwc_x16(
-  size_t output_channels,
-  size_t input_channel_stride,
-  size_t output_channel_stride,
   uint32_t block_size,
   uint32_t flags,
   xnn_operator_t* depth_to_space_op_out);
@@ -3506,6 +3685,7 @@ enum xnn_status xnn_reshape_depth_to_space_nhwc_x16(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t input_channels,
   size_t* output_height_out,
   size_t* output_width_out,
   size_t* output_channels_out,
@@ -3517,9 +3697,6 @@ enum xnn_status xnn_setup_depth_to_space_nhwc_x16(
   void* output);
 
 enum xnn_status xnn_create_depth_to_space_nhwc_x32(
-  size_t output_channels,
-  size_t input_channel_stride,
-  size_t output_channel_stride,
   uint32_t block_size,
   uint32_t flags,
   xnn_operator_t* depth_to_space_op_out);
@@ -3529,6 +3706,7 @@ enum xnn_status xnn_reshape_depth_to_space_nhwc_x32(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t input_channels,
   size_t* output_height_out,
   size_t* output_width_out,
   size_t* output_channels_out,
@@ -3643,9 +3821,6 @@ enum xnn_status xnn_setup_dynamic_fully_connected_nc_f32(
   float* output);
 
 enum xnn_status xnn_create_elu_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float alpha,
   uint32_t flags,
   xnn_operator_t* elu_op_out);
@@ -3653,6 +3828,9 @@ enum xnn_status xnn_create_elu_nc_f16(
 enum xnn_status xnn_reshape_elu_nc_f16(
   xnn_operator_t elu_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_elu_nc_f16(
@@ -3661,9 +3839,6 @@ enum xnn_status xnn_setup_elu_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_elu_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float alpha,
   uint32_t flags,
   xnn_operator_t* elu_op_out);
@@ -3671,6 +3846,9 @@ enum xnn_status xnn_create_elu_nc_f32(
 enum xnn_status xnn_reshape_elu_nc_f32(
   xnn_operator_t elu_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_elu_nc_f32(
@@ -3690,9 +3868,6 @@ enum xnn_status xnn_run_elu_nc_f32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_elu_nc_qs8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float alpha,
   int8_t input_zero_point,
   float input_scale,
@@ -3706,6 +3881,9 @@ enum xnn_status xnn_create_elu_nc_qs8(
 enum xnn_status xnn_reshape_elu_nc_qs8(
   xnn_operator_t elu_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_elu_nc_qs8(
@@ -3714,15 +3892,15 @@ enum xnn_status xnn_setup_elu_nc_qs8(
   int8_t* output);
 
 enum xnn_status xnn_create_floor_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* floor_op_out);
 
 enum xnn_status xnn_reshape_floor_nc_f16(
   xnn_operator_t floor_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_floor_nc_f16(
@@ -3731,15 +3909,15 @@ enum xnn_status xnn_setup_floor_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_floor_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* floor_op_out);
 
 enum xnn_status xnn_reshape_floor_nc_f32(
   xnn_operator_t floor_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_floor_nc_f32(
@@ -3855,6 +4033,33 @@ enum xnn_status xnn_setup_fully_connected_nc_f32_qc8w(
   xnn_operator_t fully_connected_op,
   const float* input,
   float* output);
+
+enum xnn_status xnn_create_fully_connected_nc_qd8_f16_qc4w(
+  size_t input_channels,
+  size_t output_channels,
+  size_t input_stride,
+  size_t output_stride,
+  uint8_t kernel_zero_point,
+  const float* kernel_scale,
+  const void* kernel,
+  const float* bias,
+  float output_min,
+  float output_max,
+  uint32_t flags,
+  xnn_code_cache_t code_cache,
+  xnn_weights_cache_t weights_cache,
+  xnn_operator_t* fully_connected_op_out);
+
+enum xnn_status xnn_setup_fully_connected_nc_qd8_f16_qc4w(
+  xnn_operator_t fully_connected_op,
+  const int8_t* input,
+  void* output,
+  const struct xnn_dynamic_quantization_params* quantization_params);
+
+enum xnn_status xnn_reshape_fully_connected_nc_qd8_f16_qc4w(
+  xnn_operator_t fully_connected_op,
+  size_t batch_size,
+  pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_fully_connected_nc_qd8_f32_qc4w(
   size_t input_channels,
@@ -4024,7 +4229,6 @@ enum xnn_status xnn_setup_fully_connected_nc_qu8(
   uint8_t* output);
 
 enum xnn_status xnn_create_global_average_pooling_ncw_f16(
-  size_t channels,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -4034,6 +4238,7 @@ enum xnn_status xnn_reshape_global_average_pooling_ncw_f16(
   xnn_operator_t global_average_pooling_op,
   size_t batch_size,
   size_t width,
+  size_t channels,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_global_average_pooling_ncw_f16(
@@ -4042,7 +4247,6 @@ enum xnn_status xnn_setup_global_average_pooling_ncw_f16(
   void* output);
 
 enum xnn_status xnn_create_global_average_pooling_ncw_f32(
-  size_t channels,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -4052,6 +4256,7 @@ enum xnn_status xnn_reshape_global_average_pooling_ncw_f32(
   xnn_operator_t global_average_pooling_op,
   size_t batch_size,
   size_t width,
+  size_t channels,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_global_average_pooling_ncw_f32(
@@ -4060,9 +4265,6 @@ enum xnn_status xnn_setup_global_average_pooling_ncw_f32(
   float* output);
 
 enum xnn_status xnn_create_global_average_pooling_nwc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -4072,6 +4274,9 @@ enum xnn_status xnn_reshape_global_average_pooling_nwc_f16(
   xnn_operator_t global_average_pooling_op,
   size_t batch_size,
   size_t width,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   pthreadpool_t threadpool);
@@ -4083,9 +4288,6 @@ enum xnn_status xnn_setup_global_average_pooling_nwc_f16(
   void* output);
 
 enum xnn_status xnn_create_global_average_pooling_nwc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -4095,6 +4297,9 @@ enum xnn_status xnn_reshape_global_average_pooling_nwc_f32(
   xnn_operator_t global_average_pooling_op,
   size_t batch_size,
   size_t width,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   pthreadpool_t threadpool);
@@ -4106,9 +4311,6 @@ enum xnn_status xnn_setup_global_average_pooling_nwc_f32(
   float* output);
 
 enum xnn_status xnn_create_global_average_pooling_nwc_qs8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   int8_t input_zero_point,
   float input_scale,
   int8_t output_zero_point,
@@ -4122,6 +4324,9 @@ enum xnn_status xnn_reshape_global_average_pooling_nwc_qs8(
   xnn_operator_t global_average_pooling_op,
   size_t batch_size,
   size_t width,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   pthreadpool_t threadpool);
@@ -4133,9 +4338,6 @@ enum xnn_status xnn_setup_global_average_pooling_nwc_qs8(
   int8_t* output);
 
 enum xnn_status xnn_create_global_average_pooling_nwc_qu8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint8_t input_zero_point,
   float input_scale,
   uint8_t output_zero_point,
@@ -4149,6 +4351,9 @@ enum xnn_status xnn_reshape_global_average_pooling_nwc_qu8(
   xnn_operator_t global_average_pooling_op,
   size_t batch_size,
   size_t width,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   pthreadpool_t threadpool);
@@ -4160,9 +4365,6 @@ enum xnn_status xnn_setup_global_average_pooling_nwc_qu8(
   uint8_t* output);
 
 enum xnn_status xnn_create_global_sum_pooling_nwc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -4172,6 +4374,9 @@ enum xnn_status xnn_reshape_global_sum_pooling_nwc_f16(
   xnn_operator_t global_sum_pooling_op,
   size_t batch_size,
   size_t width,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   pthreadpool_t threadpool);
@@ -4183,9 +4388,6 @@ enum xnn_status xnn_setup_global_sum_pooling_nwc_f16(
   void* output);
 
 enum xnn_status xnn_create_global_sum_pooling_nwc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float output_min,
   float output_max,
   uint32_t flags,
@@ -4195,6 +4397,9 @@ enum xnn_status xnn_reshape_global_sum_pooling_nwc_f32(
   xnn_operator_t global_sum_pooling_op,
   size_t batch_size,
   size_t width,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   pthreadpool_t threadpool);
@@ -4206,15 +4411,15 @@ enum xnn_status xnn_setup_global_sum_pooling_nwc_f32(
   float* output);
 
 enum xnn_status xnn_create_hardswish_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* hardswish_op_out);
 
 enum xnn_status xnn_reshape_hardswish_nc_f16(
   xnn_operator_t hardswish_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_hardswish_nc_f16(
@@ -4223,15 +4428,15 @@ enum xnn_status xnn_setup_hardswish_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_hardswish_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* hardswish_op_out);
 
 enum xnn_status xnn_reshape_hardswish_nc_f32(
   xnn_operator_t hardswish_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_hardswish_nc_f32(
@@ -4250,9 +4455,6 @@ enum xnn_status xnn_run_hardswish_nc_f32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_leaky_relu_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float negative_slope,
   uint32_t flags,
   xnn_operator_t* leaky_relu_op_out);
@@ -4260,6 +4462,9 @@ enum xnn_status xnn_create_leaky_relu_nc_f16(
 enum xnn_status xnn_reshape_leaky_relu_nc_f16(
   xnn_operator_t leaky_relu_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_leaky_relu_nc_f16(
@@ -4268,9 +4473,6 @@ enum xnn_status xnn_setup_leaky_relu_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_leaky_relu_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float negative_slope,
   uint32_t flags,
   xnn_operator_t* leaky_relu_op_out);
@@ -4278,6 +4480,9 @@ enum xnn_status xnn_create_leaky_relu_nc_f32(
 enum xnn_status xnn_reshape_leaky_relu_nc_f32(
   xnn_operator_t leaky_relu_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_leaky_relu_nc_f32(
@@ -4297,9 +4502,6 @@ enum xnn_status xnn_run_leaky_relu_nc_f32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_leaky_relu_nc_qs8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float negative_slope,
   int8_t input_zero_point,
   float input_scale,
@@ -4311,6 +4513,9 @@ enum xnn_status xnn_create_leaky_relu_nc_qs8(
 enum xnn_status xnn_reshape_leaky_relu_nc_qs8(
   xnn_operator_t leaky_relu_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_leaky_relu_nc_qs8(
@@ -4319,9 +4524,6 @@ enum xnn_status xnn_setup_leaky_relu_nc_qs8(
   int8_t* output);
 
 enum xnn_status xnn_create_leaky_relu_nc_qu8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float negative_slope,
   uint8_t input_zero_point,
   float input_scale,
@@ -4333,6 +4535,9 @@ enum xnn_status xnn_create_leaky_relu_nc_qu8(
 enum xnn_status xnn_reshape_leaky_relu_nc_qu8(
   xnn_operator_t leaky_relu_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_leaky_relu_nc_qu8(
@@ -4750,15 +4955,15 @@ enum xnn_status xnn_run_multiply_nd_qu8(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_negate_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* negate_op_out);
 
 enum xnn_status xnn_reshape_negate_nc_f16(
   xnn_operator_t negate_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_negate_nc_f16(
@@ -4767,15 +4972,15 @@ enum xnn_status xnn_setup_negate_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_negate_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* negate_op_out);
 
 enum xnn_status xnn_reshape_negate_nc_f32(
   xnn_operator_t negate_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_negate_nc_f32(
@@ -4834,9 +5039,8 @@ enum xnn_status xnn_setup_prelu_nc_f32(
   float* output);
 
 enum xnn_status xnn_create_resize_bilinear2d_nchw_f32(
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
+  size_t output_height,
+  size_t output_width,
   uint32_t flags,
   xnn_operator_t* resize_op_out);
 
@@ -4845,8 +5049,9 @@ enum xnn_status xnn_reshape_resize_bilinear2d_nchw_f32(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
-  size_t output_height,
-  size_t output_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_resize_bilinear2d_nchw_f32(
@@ -4855,9 +5060,8 @@ enum xnn_status xnn_setup_resize_bilinear2d_nchw_f32(
   float* output);
 
 enum xnn_status xnn_create_resize_bilinear2d_nchw_f16(
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
+  size_t output_height,
+  size_t output_width,
   uint32_t flags,
   xnn_operator_t* resize_op_out);
 
@@ -4866,8 +5070,9 @@ enum xnn_status xnn_reshape_resize_bilinear2d_nchw_f16(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
-  size_t output_height,
-  size_t output_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_resize_bilinear2d_nchw_f16(
@@ -4876,9 +5081,8 @@ enum xnn_status xnn_setup_resize_bilinear2d_nchw_f16(
   void* output);
 
 enum xnn_status xnn_create_resize_bilinear2d_nhwc_f16(
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
+  size_t output_height,
+  size_t output_width,
   uint32_t flags,
   xnn_operator_t* resize_op_out);
 
@@ -4887,8 +5091,9 @@ enum xnn_status xnn_reshape_resize_bilinear2d_nhwc_f16(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
-  size_t output_height,
-  size_t output_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   pthreadpool_t threadpool);
@@ -4900,9 +5105,8 @@ enum xnn_status xnn_setup_resize_bilinear2d_nhwc_f16(
   void* output);
 
 enum xnn_status xnn_create_resize_bilinear2d_nhwc_f32(
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
+  size_t output_height,
+  size_t output_width,
   uint32_t flags,
   xnn_operator_t* resize_op_out);
 
@@ -4911,8 +5115,9 @@ enum xnn_status xnn_reshape_resize_bilinear2d_nhwc_f32(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
-  size_t output_height,
-  size_t output_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   pthreadpool_t threadpool);
@@ -4924,9 +5129,8 @@ enum xnn_status xnn_setup_resize_bilinear2d_nhwc_f32(
   float* output);
 
 enum xnn_status xnn_create_resize_bilinear2d_nhwc_s8(
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
+  size_t output_height,
+  size_t output_width,
   uint32_t flags,
   xnn_operator_t* resize_op_out);
 
@@ -4935,8 +5139,9 @@ enum xnn_status xnn_reshape_resize_bilinear2d_nhwc_s8(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
-  size_t output_height,
-  size_t output_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   size_t* workspace_size,
   size_t* workspace,
   pthreadpool_t threadpool);
@@ -4948,9 +5153,8 @@ enum xnn_status xnn_setup_resize_bilinear2d_nhwc_s8(
   int8_t* output);
 
 enum xnn_status xnn_create_resize_bilinear2d_nhwc_u8(
-  size_t channels,
-  size_t input_pixel_stride,
-  size_t output_pixel_stride,
+  size_t output_height,
+  size_t output_width,
   uint32_t flags,
   xnn_operator_t* resize_op_out);
 
@@ -4959,8 +5163,9 @@ enum xnn_status xnn_reshape_resize_bilinear2d_nhwc_u8(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
-  size_t output_height,
-  size_t output_width,
+  size_t channels,
+  size_t input_pixel_stride,
+  size_t output_pixel_stride,
   size_t* workspace_size,
   size_t* workspace_alignment,
   pthreadpool_t threadpool);
@@ -5089,15 +5294,15 @@ enum xnn_status xnn_setup_scaled_dot_product_attention_nhtc_f32(
   float* output);
 
 enum xnn_status xnn_create_sigmoid_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* sigmoid_op_out);
 
 enum xnn_status xnn_reshape_sigmoid_nc_f16(
   xnn_operator_t sigmoid_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_sigmoid_nc_f16(
@@ -5106,15 +5311,15 @@ enum xnn_status xnn_setup_sigmoid_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_sigmoid_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* sigmoid_op_out);
 
 enum xnn_status xnn_reshape_sigmoid_nc_f32(
   xnn_operator_t sigmoid_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_sigmoid_nc_f32(
@@ -5133,9 +5338,6 @@ enum xnn_status xnn_run_sigmoid_nc_f32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_sigmoid_nc_qs8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   int8_t input_zero_point,
   float input_scale,
   int8_t output_zero_point,
@@ -5148,6 +5350,9 @@ enum xnn_status xnn_create_sigmoid_nc_qs8(
 enum xnn_status xnn_reshape_sigmoid_nc_qs8(
   xnn_operator_t sigmoid_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_sigmoid_nc_qs8(
@@ -5156,9 +5361,6 @@ enum xnn_status xnn_setup_sigmoid_nc_qs8(
   int8_t* output);
 
 enum xnn_status xnn_create_sigmoid_nc_qu8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint8_t input_zero_point,
   float input_scale,
   uint8_t output_zero_point,
@@ -5171,6 +5373,9 @@ enum xnn_status xnn_create_sigmoid_nc_qu8(
 enum xnn_status xnn_reshape_sigmoid_nc_qu8(
   xnn_operator_t sigmoid_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_sigmoid_nc_qu8(
@@ -5223,14 +5428,14 @@ enum xnn_status xnn_run_slice_nd_x32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_softmax_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* softmax_op_out);
 
 enum xnn_status xnn_reshape_softmax_nc_f16(
   xnn_operator_t softmax_op,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   size_t batch_size,
   pthreadpool_t threadpool);
 
@@ -5240,14 +5445,14 @@ enum xnn_status xnn_setup_softmax_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_softmax_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* softmax_op_out);
 
 enum xnn_status xnn_reshape_softmax_nc_f32(
   xnn_operator_t softmax_op,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   size_t batch_size,
   pthreadpool_t threadpool);
 
@@ -5257,9 +5462,6 @@ enum xnn_status xnn_setup_softmax_nc_f32(
   float* output);
 
 enum xnn_status xnn_create_softmax_nc_qu8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   float input_scale,
   uint8_t output_zero_point,
   float output_scale,
@@ -5268,6 +5470,9 @@ enum xnn_status xnn_create_softmax_nc_qu8(
 
 enum xnn_status xnn_reshape_softmax_nc_qu8(
   xnn_operator_t softmax_op,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   size_t batch_size,
   pthreadpool_t threadpool);
 
@@ -5277,9 +5482,6 @@ enum xnn_status xnn_setup_softmax_nc_qu8(
   uint8_t* output);
 
 enum xnn_status xnn_create_space_to_depth_nhwc_x16(
-  size_t input_channels,
-  size_t input_channel_stride,
-  size_t output_channel_stride,
   uint32_t block_size,
   uint32_t flags,
   xnn_operator_t* space_to_depth_op_out);
@@ -5289,6 +5491,7 @@ enum xnn_status xnn_reshape_space_to_depth_nhwc_x16(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t input_channels,
   size_t* output_height_out,
   size_t* output_width_out,
   size_t* output_channels_out,
@@ -5300,9 +5503,6 @@ enum xnn_status xnn_setup_space_to_depth_nhwc_x16(
   void* output);
 
 enum xnn_status xnn_create_space_to_depth_nhwc_x32(
-  size_t input_channels,
-  size_t input_channel_stride,
-  size_t output_channel_stride,
   uint32_t block_size,
   uint32_t flags,
   xnn_operator_t* space_to_depth_op_out);
@@ -5312,6 +5512,7 @@ enum xnn_status xnn_reshape_space_to_depth_nhwc_x32(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t input_channels,
   size_t* output_height_out,
   size_t* output_width_out,
   size_t* output_channels_out,
@@ -5323,15 +5524,15 @@ enum xnn_status xnn_setup_space_to_depth_nhwc_x32(
   void* output);
 
 enum xnn_status xnn_create_square_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* square_op_out);
 
 enum xnn_status xnn_reshape_square_nc_f16(
   xnn_operator_t square_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_square_nc_f16(
@@ -5340,15 +5541,15 @@ enum xnn_status xnn_setup_square_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_square_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* square_op_out);
 
 enum xnn_status xnn_reshape_square_nc_f32(
   xnn_operator_t square_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_square_nc_f32(
@@ -5367,15 +5568,15 @@ enum xnn_status xnn_run_square_nc_f32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_square_root_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* sqrt_op_out);
 
 enum xnn_status xnn_reshape_square_root_nc_f16(
   xnn_operator_t sqrt_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_square_root_nc_f16(
@@ -5384,15 +5585,15 @@ enum xnn_status xnn_setup_square_root_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_square_root_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* sqrt_op_out);
 
 enum xnn_status xnn_reshape_square_root_nc_f32(
   xnn_operator_t sqrt_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_square_root_nc_f32(
@@ -5601,15 +5802,15 @@ enum xnn_status xnn_run_subtract_nd_qu8(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_tanh_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* tanh_op_out);
 
 enum xnn_status xnn_reshape_tanh_nc_f16(
   xnn_operator_t tanh_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_tanh_nc_f16(
@@ -5618,15 +5819,15 @@ enum xnn_status xnn_setup_tanh_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_tanh_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* tanh_op_out);
 
 enum xnn_status xnn_reshape_tanh_nc_f32(
   xnn_operator_t tanh_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_tanh_nc_f32(
@@ -5645,9 +5846,6 @@ enum xnn_status xnn_run_tanh_nc_f32(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_tanh_nc_qs8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   int8_t input_zero_point,
   float input_scale,
   int8_t output_zero_point,
@@ -5660,6 +5858,9 @@ enum xnn_status xnn_create_tanh_nc_qs8(
 enum xnn_status xnn_reshape_tanh_nc_qs8(
   xnn_operator_t tanh_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_tanh_nc_qs8(
@@ -5668,9 +5869,6 @@ enum xnn_status xnn_setup_tanh_nc_qs8(
   int8_t* output);
 
 enum xnn_status xnn_create_tanh_nc_qu8(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint8_t input_zero_point,
   float input_scale,
   uint8_t output_zero_point,
@@ -5683,6 +5881,9 @@ enum xnn_status xnn_create_tanh_nc_qu8(
 enum xnn_status xnn_reshape_tanh_nc_qu8(
   xnn_operator_t tanh_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_tanh_nc_qu8(
@@ -5791,15 +5992,15 @@ enum xnn_status xnn_run_transpose_nd_x64(
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_create_truncation_nc_f16(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* truncation_op_out);
 
 enum xnn_status xnn_reshape_truncation_nc_f16(
   xnn_operator_t truncation_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_truncation_nc_f16(
@@ -5808,15 +6009,15 @@ enum xnn_status xnn_setup_truncation_nc_f16(
   void* output);
 
 enum xnn_status xnn_create_truncation_nc_f32(
-  size_t channels,
-  size_t input_stride,
-  size_t output_stride,
   uint32_t flags,
   xnn_operator_t* truncation_op_out);
 
 enum xnn_status xnn_reshape_truncation_nc_f32(
   xnn_operator_t truncation_op,
   size_t batch_size,
+  size_t channels,
+  size_t input_stride,
+  size_t output_stride,
   pthreadpool_t threadpool);
 
 enum xnn_status xnn_setup_truncation_nc_f32(
@@ -5880,9 +6081,6 @@ enum xnn_status xnn_setup_slice_nd_x8(
   void* output);
 
 enum xnn_status xnn_create_space_to_depth_nhwc_x8(
-  size_t input_channels,
-  size_t input_channel_stride,
-  size_t output_channel_stride,
   uint32_t block_size,
   uint32_t flags,
   xnn_operator_t* space_to_depth_op_out);
@@ -5892,6 +6090,7 @@ enum xnn_status xnn_reshape_space_to_depth_nhwc_x8(
   size_t batch_size,
   size_t input_height,
   size_t input_width,
+  size_t input_channels,
   size_t* output_height_out,
   size_t* output_width_out,
   size_t* output_channels_out,

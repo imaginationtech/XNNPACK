@@ -72,6 +72,11 @@ static void f16_vsqrt(
                     benchmark::utils::CheckNEONFP16ARITH)
     ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
     ->UseRealTime();
+  BENCHMARK_CAPTURE(f16_vsqrt, aarch64_neonfp16arith_sqrt_u32,
+                    xnn_f16_vsqrt_ukernel__aarch64_neonfp16arith_sqrt_u32,
+                    benchmark::utils::CheckNEONFP16ARITH)
+    ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
+    ->UseRealTime();
 #endif  // XNN_ENABLE_ARM_FP16_VECTOR && XNN_ARCH_ARM64
 
 #if XNN_ENABLE_ARM_FP16_VECTOR && (XNN_ARCH_ARM || XNN_ARCH_ARM64)
@@ -82,11 +87,6 @@ static void f16_vsqrt(
     ->UseRealTime();
   BENCHMARK_CAPTURE(f16_vsqrt, neonfp16arith_nr1fma1adj_u16,
                     xnn_f16_vsqrt_ukernel__neonfp16arith_nr1fma1adj_u16,
-                    benchmark::utils::CheckNEONFP16ARITH)
-    ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
-    ->UseRealTime();
-  BENCHMARK_CAPTURE(f16_vsqrt, neonfp16arith_nr1fma1adj_u24,
-                    xnn_f16_vsqrt_ukernel__neonfp16arith_nr1fma1adj_u24,
                     benchmark::utils::CheckNEONFP16ARITH)
     ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
     ->UseRealTime();
@@ -115,7 +115,39 @@ static void f16_vsqrt(
     ->UseRealTime();
 #endif  // XNN_ENABLE_ARM_FP16_SCALAR && (XNN_ARCH_ARM || XNN_ARCH_ARM64)
 
+#if XNN_ARCH_X86 || XNN_ARCH_X86_64
+  BENCHMARK_CAPTURE(f16_vsqrt, f16c_sqrt_u8,
+                    xnn_f16_vsqrt_ukernel__f16c_sqrt_u8,
+                    benchmark::utils::CheckF16C)
+      ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
+      ->UseRealTime();
+  BENCHMARK_CAPTURE(f16_vsqrt, f16c_sqrt_u16,
+                    xnn_f16_vsqrt_ukernel__f16c_sqrt_u16,
+                    benchmark::utils::CheckF16C)
+      ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
+      ->UseRealTime();
+  BENCHMARK_CAPTURE(f16_vsqrt, f16c_sqrt_u32,
+                    xnn_f16_vsqrt_ukernel__f16c_sqrt_u32,
+                    benchmark::utils::CheckF16C)
+      ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
+      ->UseRealTime();
+  BENCHMARK_CAPTURE(f16_vsqrt, f16c_rsqrt_u8,
+                    xnn_f16_vsqrt_ukernel__f16c_rsqrt_u8,
+                    benchmark::utils::CheckF16C)
+      ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
+      ->UseRealTime();
+  BENCHMARK_CAPTURE(f16_vsqrt, f16c_rsqrt_u16,
+                    xnn_f16_vsqrt_ukernel__f16c_rsqrt_u16,
+                    benchmark::utils::CheckF16C)
+      ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
+      ->UseRealTime();
+  BENCHMARK_CAPTURE(f16_vsqrt, f16c_rsqrt_u32,
+                    xnn_f16_vsqrt_ukernel__f16c_rsqrt_u32,
+                    benchmark::utils::CheckF16C)
+      ->Apply(benchmark::utils::UnaryElementwiseParameters<uint16_t, uint16_t>)
+      ->UseRealTime();
+#endif  // XNN_ARCH_X86 || XNN_ARCH_X86_64
 
 #ifndef XNNPACK_BENCHMARK_NO_MAIN
-BENCHMARK_MAIN();
+  BENCHMARK_MAIN();
 #endif

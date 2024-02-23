@@ -1020,7 +1020,6 @@ ExecutionPlan QU8MobileNetV1(pthreadpool_t threadpool) {
 
   xnn_operator_t op27 = nullptr;
   status = xnn_create_global_average_pooling_nwc_qu8(
-    1024 /* channels */, 1024 /* input stride */, 1024 /* output stride */,
     0 /* input zero point */, 0.023528477177023888 /* input scale */,
     0 /* output zero point */, 0.023528477177023888 /* output scale */,
     0 /* output min */, 255 /* output max */,
@@ -1064,9 +1063,6 @@ ExecutionPlan QU8MobileNetV1(pthreadpool_t threadpool) {
 
   xnn_operator_t op29 = nullptr;
   status = xnn_create_copy_nc_x8(
-    1 /* channels */,
-    1 /* input stride */,
-    1 /* output stride */,
     0 /* flags */,
     &op29);
   if (status != xnn_status_success) {
@@ -1077,9 +1073,6 @@ ExecutionPlan QU8MobileNetV1(pthreadpool_t threadpool) {
 
   xnn_operator_t op30 = nullptr;
   status = xnn_create_softmax_nc_qu8(
-    /*channels=*/1001,
-    /*input_stride=*/1001,
-    /*output_stride=*/1001,
     /*input_scale=*/0.16609922051429749,
     /*output_zero_point=*/0,
     /*output_scale=*/0.00390625,
@@ -1474,6 +1467,7 @@ ExecutionPlan QU8MobileNetV1(pthreadpool_t threadpool) {
   status = xnn_reshape_global_average_pooling_nwc_qu8(
     op27,
     /*batch_size=*/1, 49 /* width */,
+    1024 /* channels */, 1024 /* input stride */, 1024 /* output stride */,
     &op27_workspace_size, &op27_workspace_alignment,
     /*threadpool=*/threadpool);
   max_workspace_size = std::max(max_workspace_size, op27_workspace_size);
@@ -1499,6 +1493,9 @@ ExecutionPlan QU8MobileNetV1(pthreadpool_t threadpool) {
   status = xnn_reshape_copy_nc_x8(
     op29,
     /*batch_size=*/1001,
+    1 /* channels */,
+    1 /* input stride */,
+    1 /* output stride */,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
     std::cerr << "failed to reshape operation #29" << std::endl;
@@ -1507,6 +1504,9 @@ ExecutionPlan QU8MobileNetV1(pthreadpool_t threadpool) {
 
   status = xnn_reshape_softmax_nc_qu8(
     op30,
+    /*channels=*/1001,
+    /*input_stride=*/1001,
+    /*output_stride=*/1001,
     /*batch_size=*/1,
     /*threadpool=*/threadpool);
   if (status != xnn_status_success) {
