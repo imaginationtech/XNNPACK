@@ -3,22 +3,26 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include <algorithm>   // For std::generate, std::shuffle.
-#include <array>       // For std::array.
-#include <cstddef>     // For size_t.
-#include <functional>  // For std::multiplies.
-#include <memory>      // For std::unique_ptr.
-#include <numeric>     // For std::accumulate.
-#include <random>      // For std::random_device, std::mt19937, std::uniform_real_distribution.
-#include <vector>      // For std::vector.
-
 #include <xnnpack.h>
 #include <xnnpack/node-type.h>
 #include <xnnpack/operator.h>
 #include <xnnpack/subgraph.h>
 
+#include <algorithm>  // For std::generate, std::shuffle.
+#include <array>      // For std::array.
+#include <cmath>
+#include <cstddef>  // For size_t.
+#include <cstdint>
+#include <functional>  // For std::multiplies.
+#include <memory>      // For std::unique_ptr.
+#include <numeric>     // For std::accumulate.
+#include <random>      // For std::uniform_real_distribution.
+#include <vector>      // For std::vector.
+
+#include "replicable_random_device.h"
 #include "subgraph-unary-tester.h"
 #include <gtest/gtest.h>
+#include <fp16/fp16.h>
 
 template <typename InputType, typename OutputType = InputType,
           size_t min_dim = 0, size_t max_dim = XNN_MAX_TENSOR_DIMS,
@@ -34,6 +38,9 @@ class StaticReshapeTest
   std::vector<size_t> RandomSetOneDimsionToZero(
       const std::vector<size_t> given_dims) {
     std::vector<size_t> result = given_dims;
+    if (result.empty()) {
+      return result;
+    }
     // Randomly set one dimension to zero.
     auto dynamic_axis_dist =
         std::uniform_int_distribution<size_t>(0, result.size() - 1);
@@ -62,6 +69,7 @@ class StaticReshapeTest
 
 using StaticReshapeTestInt8 = StaticReshapeTest<int8_t>;
 using StaticReshapeTestUint8 = StaticReshapeTest<uint8_t>;
+using StaticReshapeTestF16 = StaticReshapeTest<uint16_t>;
 using StaticReshapeTestF32 = StaticReshapeTest<float>;
 
 TEST_F(StaticReshapeTestInt8, define)
@@ -133,6 +141,40 @@ TEST_F(StaticReshapeTestUint8, define)
   const struct xnn_node* node = &subgraph->nodes[0];
   ASSERT_EQ(node->type, xnn_node_type_static_reshape);
   ASSERT_EQ(node->compute_type, xnn_compute_type_qu8);
+  ASSERT_EQ(node->num_inputs, 1);
+  ASSERT_EQ(node->inputs[0], input_id);
+  ASSERT_EQ(node->num_outputs, 1);
+  ASSERT_EQ(node->outputs[0], output_id);
+  ASSERT_EQ(node->flags, 0);
+}
+
+TEST_F(StaticReshapeTestF16, define)
+{
+  ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
+
+  xnn_subgraph_t subgraph = nullptr;
+  ASSERT_EQ(xnn_status_success, xnn_create_subgraph(0, /*flags=*/0, &subgraph));
+  std::unique_ptr<xnn_subgraph, decltype(&xnn_delete_subgraph)> auto_subgraph(subgraph, xnn_delete_subgraph);
+  uint32_t input_id = XNN_INVALID_NODE_ID;
+  ASSERT_EQ(
+    xnn_status_success,
+    xnn_define_tensor_value(
+      subgraph, xnn_datatype_fp16, dims.size(), dims.data(), nullptr, XNN_INVALID_VALUE_ID, /*flags=*/0, &input_id));
+  ASSERT_NE(input_id, XNN_INVALID_NODE_ID);
+
+  uint32_t output_id = XNN_INVALID_NODE_ID;
+  ASSERT_EQ(
+    xnn_status_success,
+    xnn_define_tensor_value(
+      subgraph, xnn_datatype_fp16, dims.size(), dims.data(), nullptr, XNN_INVALID_VALUE_ID, /*flags=*/0, &output_id));
+  ASSERT_NE(output_id, XNN_INVALID_NODE_ID);
+
+  ASSERT_EQ(xnn_status_success, xnn_define_static_reshape(subgraph, dims.size(), dims.data(), input_id, output_id, 0));
+
+  ASSERT_EQ(subgraph->num_nodes, 1);
+  const struct xnn_node* node = &subgraph->nodes[0];
+  ASSERT_EQ(node->type, xnn_node_type_static_reshape);
+  ASSERT_EQ(node->compute_type, xnn_compute_type_fp16);
   ASSERT_EQ(node->num_inputs, 1);
   ASSERT_EQ(node->inputs[0], input_id);
   ASSERT_EQ(node->num_outputs, 1);
@@ -300,6 +342,64 @@ TEST_F(StaticReshapeTestUint8, matches_operator_api)
   ASSERT_EQ(subgraph_output, operator_output);
 }
 
+TEST_F(StaticReshapeTestF16, matches_operator_api)
+{
+  std::generate(input.begin(), input.end(), [&]() { return fp16_ieee_from_fp32_value(f32dist(rng)); });
+  std::fill(operator_output.begin(), operator_output.end(), UINT16_C(0x7E00) /* NaN */);
+  std::fill(subgraph_output.begin(), subgraph_output.end(), UINT16_C(0x7E00) /* NaN */);
+
+  std::vector<size_t> output_dims = dims;
+  std::shuffle(output_dims.begin(), output_dims.end(), rng);
+
+  ASSERT_EQ(xnn_status_success, xnn_initialize(/*allocator=*/nullptr));
+
+  // Call operator API.
+  xnn_operator_t op = nullptr;
+  xnn_status status = xnn_create_copy_nc_x16(/*flags=*/0, &op);
+  if (status == xnn_status_unsupported_hardware) {
+    GTEST_SKIP();
+  }
+  ASSERT_EQ(xnn_status_success, status);
+  ASSERT_NE(nullptr, op);
+  std::unique_ptr<xnn_operator, decltype(&xnn_delete_operator)> auto_op(op, xnn_delete_operator);
+  size_t batch_size = NumElements(dims);
+  ASSERT_EQ(xnn_status_success, xnn_reshape_copy_nc_x16(op, batch_size, 1, 1, 1, /*threadpool=*/nullptr));
+  ASSERT_EQ(xnn_status_success, xnn_setup_copy_nc_x16(op, input.data(), operator_output.data()));
+  ASSERT_EQ(xnn_status_success, xnn_run_operator(op, /*threadpool=*/nullptr));
+
+  // Call subgraph API.
+  xnn_subgraph_t subgraph = nullptr;
+  ASSERT_EQ(xnn_status_success, xnn_create_subgraph(/*external_value_ids=*/2, /*flags=*/0, &subgraph));
+  ASSERT_NE(nullptr, subgraph);
+  std::unique_ptr<xnn_subgraph, decltype(&xnn_delete_subgraph)> auto_subgraph(subgraph, xnn_delete_subgraph);
+  uint32_t input_id = XNN_INVALID_NODE_ID;
+  ASSERT_EQ(
+    xnn_status_success, xnn_define_tensor_value(
+                          subgraph, xnn_datatype_fp16, dims.size(), dims.data(), nullptr, /*external_id=*/0,
+                          XNN_VALUE_FLAG_EXTERNAL_INPUT, &input_id));
+  ASSERT_NE(input_id, XNN_INVALID_NODE_ID);
+  uint32_t output_id = XNN_INVALID_NODE_ID;
+
+  ASSERT_EQ(
+    xnn_status_success, xnn_define_tensor_value(
+                          subgraph, xnn_datatype_fp16, output_dims.size(), output_dims.data(), nullptr,
+                          /*external_id=*/1, XNN_VALUE_FLAG_EXTERNAL_OUTPUT, &output_id));
+  ASSERT_NE(output_id, XNN_INVALID_NODE_ID);
+  ASSERT_EQ(
+    xnn_status_success,
+    xnn_define_static_reshape(subgraph, output_dims.size(), output_dims.data(), input_id, output_id, /*flags=*/0));
+  xnn_runtime_t runtime = nullptr;
+  ASSERT_EQ(xnn_status_success, xnn_create_runtime_v3(subgraph, nullptr, nullptr, /*flags=*/0, &runtime));
+  ASSERT_NE(nullptr, runtime);
+  std::unique_ptr<xnn_runtime, decltype(&xnn_delete_runtime)> auto_runtime(runtime, xnn_delete_runtime);
+  std::array<xnn_external_value, 2> external = {
+    xnn_external_value{input_id, input.data()}, xnn_external_value{output_id, subgraph_output.data()}};
+  ASSERT_EQ(xnn_status_success, xnn_setup_runtime(runtime, external.size(), external.data()));
+  ASSERT_EQ(xnn_status_success, xnn_invoke_runtime(runtime));
+
+  ASSERT_EQ(subgraph_output, operator_output);
+}
+
 TEST_F(StaticReshapeTestF32, matches_operator_api)
 {
   std::generate(input.begin(), input.end(), [&]() { return f32dist(rng); });
@@ -407,22 +507,28 @@ TEST_F(StaticReshapeTestF32, reshape_output) {
   ASSERT_EQ(xnn_status_success, xnn_invoke_runtime(runtime));
 
   // Change the input shape (make it large enough to trigger a reallocation).
-  dims.front() *= 2;
-  dims.back() *= 3;
+  if (!dims.empty()) {
+    dims.front() *= 2;
+    dims.back() *= 3;
+  }
   ASSERT_EQ(xnn_status_success,
             xnn_reshape_external_value(runtime, input_id, dims.size(),
                                        dims.data()));
   const struct xnn_node* node = &subgraph->nodes[0];
-  ASSERT_EQ(node->reshape(&runtime->opdata[0], runtime->values,
-                          runtime->num_values, /*threadpool=*/nullptr),
-            xnn_status_reallocation_required);
+  xnn_status status =
+      node->reshape(&runtime->opdata[0], runtime->values, runtime->num_values,
+                    /*threadpool=*/nullptr);
+  ASSERT_EQ(status, dims.empty() ? xnn_status_success
+                                 : xnn_status_reallocation_required);
   const xnn_shape* output_shape = &runtime->values[node->outputs[0]].shape;
   EXPECT_EQ(xnn_shape_multiply_all_dims(output_shape),
             std::accumulate(dims.begin(), dims.end(), size_t(1),
                             std::multiplies<size_t>()));
 
   // Change the input shape (make it a bit smaller again).
-  dims.front() /= 2;
+  if (!dims.empty()) {
+    dims.front() /= 2;
+  }
   ASSERT_EQ(xnn_status_success,
             xnn_reshape_external_value(runtime, input_id, dims.size(),
                                        dims.data()));

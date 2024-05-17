@@ -4,16 +4,20 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include <xnnpack.h>
+#include <xnnpack/common.h>
 #include <xnnpack/log.h>
+#include <xnnpack/node-type.h>
+#include <xnnpack/operator-type.h>
 #include <xnnpack/operator.h>
-#include <xnnpack/params.h>
-#include <xnnpack/subgraph.h>
 #include <xnnpack/subgraph-validation.h>
+#include <xnnpack/subgraph.h>
 
+#include "pthreadpool.h"
 
 static enum xnn_status create_depth_to_space_operator(
   const struct xnn_node* node,
@@ -170,6 +174,7 @@ static enum xnn_status reshape_depth_to_space_operator(
   output_value->shape.dim[2] = output_width;
   output_value->shape.dim[3] = output_channels;
 
+  output_value->shape.num_dims = 4;
   const size_t new_size = xnn_tensor_get_size(output_value);
   if (new_size > output_value->size || opdata->workspace_size > old_workspace_size) {
     output_value->size = new_size;
@@ -255,6 +260,7 @@ enum xnn_status xnn_define_depth_to_space_2d(
   }
 
   switch (input_value->datatype) {
+    case xnn_datatype_fp16:
     case xnn_datatype_fp32:
     case xnn_datatype_qint8:
     case xnn_datatype_quint8:
@@ -280,6 +286,9 @@ enum xnn_status xnn_define_depth_to_space_2d(
 
   enum xnn_compute_type compute_type = xnn_compute_type_invalid;
   switch (output_value->datatype) {
+    case xnn_datatype_fp16:
+      compute_type = xnn_compute_type_fp16;
+      break;
     case xnn_datatype_fp32:
       compute_type = xnn_compute_type_fp32;
       break;

@@ -11,38 +11,54 @@ load(
 )
 
 MICROKERNEL_TEST_DEPS = [
+    ":replicable_random_device",
+    "@FP16",
     "//:aligned_allocator",
     "//:allocator",
     "//:common",
     "//:enable_assembly",
     "//:isa_checks",
     "//:math",
-    "//:microkernels_h",
-    "//:microparams",
-    "//:microparams_init",
     "//:memory",
+    "//:microkernels_h",
+    "//:microparams_init",
+    "//:microparams",
+    "//:packing",
     "//:params",
     "//:quantization",
     "//:requantization",
     "//:test_microkernels",
     "//:xnnpack_h",
-    "@FP16",
 ]
 
 OPERATOR_TEST_DEPS = [
+    ":replicable_random_device",
+    "@FP16",
+    "@pthreadpool",
+    "//:aligned_allocator",
     "//:allocator",
     "//:cache",
     "//:common",
+    "//:jit_test_mode",
+    "//:math",
+    "//:microparams",
+    "//:normalization_test_mode",
     "//:params",
     "//:quantization",
     "//:XNNPACK_test_mode",
-    "//:jit_test_mode",
-    "//:normalization_test_mode",
-    "@pthreadpool",
-    "@FP16",
 ]
 
-######################### Unit tests for micro-kernels #########################
+############################## Testing utilities ###############################
+
+xnnpack_cc_library(
+    name = "replicable_random_device",
+    testonly = True,
+    hdrs = ["replicable_random_device.h"],
+    deps = [
+        "//:xnnpack_h",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
 
 xnnpack_cc_library(
     name = "gemm_microkernel_tester",
@@ -51,10 +67,74 @@ xnnpack_cc_library(
     hdrs = ["gemm-microkernel-tester.h"],
     deps = MICROKERNEL_TEST_DEPS + [
         "//:XNNPACK_test_mode",
+        "//:jit",
+        "//:packing_test_mode",
+        "//:post_operation",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+xnnpack_cc_library(
+    name = "unary_operator_tester",
+    testonly = True,
+    srcs = ["unary-operator-tester.cc"],
+    hdrs = ["unary-operator-tester.h"],
+    deps = OPERATOR_TEST_DEPS + ["@com_google_googletest//:gtest_main"],
+)
+
+xnnpack_cc_library(
+    name = "binary_elementwise_operator_tester",
+    testonly = True,
+    srcs = ["binary-elementwise-operator-tester.cc"],
+    hdrs = ["binary-elementwise-operator-tester.h"],
+    deps = OPERATOR_TEST_DEPS + ["@com_google_googletest//:gtest_main"],
+)
+
+xnnpack_cc_library(
+    name = "vunary_microkernel_tester",
+    testonly = True,
+    srcs = ["vunary-microkernel-tester.cc"],
+    hdrs = ["vunary-microkernel-tester.h"],
+    deps = MICROKERNEL_TEST_DEPS + ["@com_google_googletest//:gtest_main"],
+)
+
+xnnpack_cc_library(
+    name = "vbinary_microkernel_tester",
+    testonly = True,
+    srcs = ["vbinary-microkernel-tester.cc"],
+    hdrs = ["vbinary-microkernel-tester.h"],
+    deps = MICROKERNEL_TEST_DEPS + ["@com_google_googletest//:gtest_main"],
+)
+
+xnnpack_cc_library(
+    name = "vbinaryc_microkernel_tester",
+    testonly = True,
+    srcs = ["vbinaryc-microkernel-tester.cc"],
+    hdrs = ["vbinaryc-microkernel-tester.h"],
+    deps = MICROKERNEL_TEST_DEPS + ["@com_google_googletest//:gtest_main"],
+)
+
+xnnpack_cc_library(
+    name = "dwconv_microkernel_tester",
+    testonly = True,
+    srcs = ["dwconv-microkernel-tester.cc"],
+    hdrs = ["dwconv-microkernel-tester.h"],
+    deps = MICROKERNEL_TEST_DEPS + [
+        "//:microkernel_utils",
         "//:packing_test_mode",
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+xnnpack_cc_library(
+    name = "vcvt_microkernel_tester",
+    testonly = True,
+    srcs = ["vcvt-microkernel-tester.cc"],
+    hdrs = ["vcvt-microkernel-tester.h"],
+    deps = MICROKERNEL_TEST_DEPS + ["@com_google_googletest//:gtest_main"],
+)
+
+######################### Unit tests for micro-kernels #########################
 
 xnnpack_unit_test(
     name = "bf16_gemm_minmax_test",
@@ -70,9 +150,8 @@ xnnpack_unit_test(
     name = "f16_f32_vcvt_test",
     srcs = [
         "f16-f32-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -87,26 +166,22 @@ xnnpack_unit_test(
 xnnpack_unit_test(
     name = "f16_dwconv_minmax_multipass_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "f16-dwconv-minmax-multipass.cc",
     ],
     shard_count = 5,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "f16_dwconv_minmax_unipass_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "f16-dwconv-minmax-unipass.cc",
     ],
     shard_count = 5,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
@@ -242,9 +317,8 @@ xnnpack_unit_test(
     name = "f16_qs8_vcvt_test",
     srcs = [
         "f16-qs8-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -257,147 +331,139 @@ xnnpack_unit_test(
 )
 
 xnnpack_unit_test(
+    name = "bf16_vabs_test",
+    srcs = [
+        "bf16-vabs.cc",
+    ],
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
+)
+
+xnnpack_unit_test(
     name = "f16_vabs_test",
     srcs = [
         "f16-vabs.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vadd_minmax_test",
     srcs = [
         "f16-vadd-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vaddc_minmax_test",
     srcs = [
         "f16-vaddc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vclamp_test",
     srcs = [
         "f16-vclamp.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vdiv_minmax_test",
     srcs = [
         "f16-vdiv-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vdivc_minmax_test",
     srcs = [
         "f16-vdivc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vrdivc_minmax_test",
     srcs = [
         "f16-vrdivc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_velu_test",
     srcs = [
         "f16-velu.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vhswish_test",
     srcs = [
         "f16-vhswish.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vlrelu_test",
     srcs = [
         "f16-vlrelu.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vmax_test",
     srcs = [
         "f16-vmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vmaxc_test",
     srcs = [
         "f16-vmaxc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vmin_test",
     srcs = [
         "f16-vmin.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vminc_test",
     srcs = [
         "f16-vminc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vmul_minmax_test",
     srcs = [
         "f16-vmul-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vmulc_minmax_test",
     srcs = [
         "f16-vmulc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -413,54 +479,56 @@ xnnpack_unit_test(
     name = "f16_vneg_test",
     srcs = [
         "f16-vneg.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vrndne_test",
     srcs = [
         "f16-vrndne.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vrndz_test",
     srcs = [
         "f16-vrndz.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vrndu_test",
     srcs = [
         "f16-vrndu.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vrndd_test",
     srcs = [
         "f16-vrndd.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
+)
+
+xnnpack_unit_test(
+    name = "f16_vrsqrt_test",
+    srcs = [
+        "f16-vrsqrt.cc",
+    ],
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vsqrt_test",
     srcs = [
         "f16-vsqrt.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -521,54 +589,64 @@ xnnpack_unit_test(
     name = "f16_vsigmoid_test",
     srcs = [
         "f16-vsigmoid.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vsqr_test",
     srcs = [
         "f16-vsqr.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
+)
+
+xnnpack_unit_test(
+    name = "f16_vsqrdiff_test",
+    srcs = [
+        "f16-vsqrdiff.cc",
+    ],
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
+)
+
+xnnpack_unit_test(
+    name = "f16_vsqrdiffc_test",
+    srcs = [
+        "f16-vsqrdiffc.cc",
+    ],
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vsub_minmax_test",
     srcs = [
         "f16-vsub-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vsubc_minmax_test",
     srcs = [
         "f16-vsubc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vrsubc_minmax_test",
     srcs = [
         "f16-vrsubc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f16_vtanh_test",
     srcs = [
         "f16-vtanh.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -684,51 +762,43 @@ xnnpack_unit_test(
 xnnpack_unit_test(
     name = "f32_dwconv_unipass_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "f32-dwconv-unipass.cc",
     ],
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "f32_dwconv_multipass_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "f32-dwconv-multipass.cc",
     ],
     shard_count = 5,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "f32_dwconv_minmax_multipass_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "f32-dwconv-minmax-multipass.cc",
     ],
     shard_count = 5,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "f32_dwconv_minmax_unipass_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "f32-dwconv-minmax-unipass.cc",
     ],
     shard_count = 5,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
@@ -754,9 +824,8 @@ xnnpack_unit_test(
     name = "f32_f16_vcvt_test",
     srcs = [
         "f32-f16-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -895,9 +964,8 @@ xnnpack_unit_test(
     name = "f32_vhswish_test",
     srcs = [
         "f32-vhswish.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -941,18 +1009,16 @@ xnnpack_unit_test(
     name = "f32_qs8_vcvt_test",
     srcs = [
         "f32-qs8-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_qu8_vcvt_test",
     srcs = [
         "f32-qu8-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -1019,6 +1085,33 @@ xnnpack_unit_test(
 )
 
 xnnpack_unit_test(
+    name = "qs8_rsum_minmax_fp32_test",
+    srcs = [
+        "qs8-rsum-minmax-fp32.cc",
+        "rsum-microkernel-tester.h",
+    ],
+    deps = MICROKERNEL_TEST_DEPS,
+)
+
+xnnpack_unit_test(
+    name = "f16_f32acc_rdsum_test",
+    srcs = [
+        "f16-f32acc-rdsum.cc",
+        "rdsum-microkernel-tester.h",
+    ],
+    deps = MICROKERNEL_TEST_DEPS,
+)
+
+xnnpack_unit_test(
+    name = "f32_rdsum_test",
+    srcs = [
+        "f32-rdsum.cc",
+        "rdsum-microkernel-tester.h",
+    ],
+    deps = MICROKERNEL_TEST_DEPS,
+)
+
+xnnpack_unit_test(
     name = "f32_spmm_minmax_test",
     srcs = [
         "f32-spmm-minmax.cc",
@@ -1034,72 +1127,64 @@ xnnpack_unit_test(
     name = "f32_vabs_test",
     srcs = [
         "f32-vabs.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vadd_test",
     srcs = [
         "f32-vadd.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vadd_minmax_test",
     srcs = [
         "f32-vadd-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vadd_relu_test",
     srcs = [
         "f32-vadd-relu.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vaddc_test",
     srcs = [
         "f32-vaddc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vaddc_minmax_test",
     srcs = [
         "f32-vaddc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vaddc_relu_test",
     srcs = [
         "f32-vaddc-relu.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vclamp_test",
     srcs = [
         "f32-vclamp.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -1124,180 +1209,160 @@ xnnpack_unit_test(
     name = "f32_vdiv_test",
     srcs = [
         "f32-vdiv.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vdiv_minmax_test",
     srcs = [
         "f32-vdiv-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vdiv_relu_test",
     srcs = [
         "f32-vdiv-relu.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vdivc_test",
     srcs = [
         "f32-vdivc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vdivc_minmax_test",
     srcs = [
         "f32-vdivc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vdivc_relu_test",
     srcs = [
         "f32-vdivc-relu.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrdivc_test",
     srcs = [
         "f32-vrdivc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrdivc_minmax_test",
     srcs = [
         "f32-vrdivc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrdivc_relu_test",
     srcs = [
         "f32-vrdivc-relu.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_velu_test",
     srcs = [
         "f32-velu.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vmax_test",
     srcs = [
         "f32-vmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vmaxc_test",
     srcs = [
         "f32-vmaxc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vmin_test",
     srcs = [
         "f32-vmin.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vminc_test",
     srcs = [
         "f32-vminc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vmul_test",
     srcs = [
         "f32-vmul.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vmul_minmax_test",
     srcs = [
         "f32-vmul-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vmul_relu_test",
     srcs = [
         "f32-vmul-relu.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vmulc_test",
     srcs = [
         "f32-vmulc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vmulc_minmax_test",
     srcs = [
         "f32-vmulc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vmulc_relu_test",
     srcs = [
         "f32-vmulc-relu.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -1313,72 +1378,67 @@ xnnpack_unit_test(
     name = "f32_vlrelu_test",
     srcs = [
         "f32-vlrelu.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vneg_test",
     srcs = [
         "f32-vneg.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrelu_test",
     srcs = [
         "f32-vrelu.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS + ["//:jit_test_mode"],
+    deps = MICROKERNEL_TEST_DEPS + [
+        ":vunary_microkernel_tester",
+        "//:jit_test_mode",
+    ],
 )
 
 xnnpack_unit_test(
     name = "f32_vrndne_test",
     srcs = [
         "f32-vrndne.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrndz_test",
     srcs = [
         "f32-vrndz.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrndu_test",
     srcs = [
         "f32-vrndu.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrndd_test",
     srcs = [
         "f32-vrndd.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrsqrt_test",
     srcs = [
         "f32-vrsqrt.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -1403,137 +1463,122 @@ xnnpack_unit_test(
     name = "f32_vsigmoid_test",
     srcs = [
         "f32-vsigmoid.cc",
-        "vunary-microkernel-tester.h",
     ],
     shard_count = 3,
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsqr_test",
     srcs = [
         "f32-vsqr.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsqrdiff_test",
     srcs = [
         "f32-vsqrdiff.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsqrdiffc_test",
     srcs = [
         "f32-vsqrdiffc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsqrt_test",
     srcs = [
         "f32-vsqrt.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsub_test",
     srcs = [
         "f32-vsub.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsub_minmax_test",
     srcs = [
         "f32-vsub-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsub_relu_test",
     srcs = [
         "f32-vsub-relu.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsubc_test",
     srcs = [
         "f32-vsubc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsubc_minmax_test",
     srcs = [
         "f32-vsubc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vsubc_relu_test",
     srcs = [
         "f32-vsubc-relu.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrsubc_test",
     srcs = [
         "f32-vrsubc.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrsubc_minmax_test",
     srcs = [
         "f32-vrsubc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vrsubc_relu_test",
     srcs = [
         "f32-vrsubc-relu.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "f32_vtanh_test",
     srcs = [
         "f32-vtanh.cc",
-        "vunary-microkernel-tester.h",
     ],
     shard_count = 10,
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -1600,13 +1645,11 @@ xnnpack_unit_test(
     name = "qs8_qc8w_dwconv_minmax_multipass_fp32_test",
     timeout = "moderate",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qs8-qc8w-dwconv-minmax-multipass-fp32.cc",
     ],
     shard_count = 10,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
@@ -1614,13 +1657,11 @@ xnnpack_unit_test(
     name = "qs8_qc8w_dwconv_minmax_unipass_fp32_test",
     timeout = "moderate",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qs8-qc8w-dwconv-minmax-unipass-fp32.cc",
     ],
     shard_count = 10,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
@@ -1705,51 +1746,43 @@ xnnpack_unit_test(
 xnnpack_unit_test(
     name = "qs8_dwconv_minmax_multipass_fp32_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qs8-dwconv-minmax-multipass-fp32.cc",
     ],
     shard_count = 10,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "qs8_dwconv_minmax_multipass_rndnu_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qs8-dwconv-minmax-multipass-rndnu.cc",
     ],
     shard_count = 10,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "qs8_dwconv_minmax_unipass_fp32_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qs8-dwconv-minmax-unipass-fp32.cc",
     ],
     shard_count = 10,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "qs8_dwconv_minmax_unipass_rndnu_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qs8-dwconv-minmax-unipass-rndnu.cc",
     ],
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
@@ -1757,18 +1790,16 @@ xnnpack_unit_test(
     name = "qs8_f16_vcvt_test",
     srcs = [
         "qs8-f16-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qs8_f32_vcvt_test",
     srcs = [
         "qs8-f32-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -1803,36 +1834,32 @@ xnnpack_unit_test(
     name = "qs8_vadd_minmax_test",
     srcs = [
         "qs8-vadd-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qs8_vaddc_minmax_test",
     srcs = [
         "qs8-vaddc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qs8_vcvt_test",
     srcs = [
         "qs8-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qs16_qs8_vcvt_test",
     srcs = [
         "qs16-qs8-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -1857,36 +1884,32 @@ xnnpack_unit_test(
     name = "qs8_vmul_minmax_fp32_test",
     srcs = [
         "qs8-vmul-minmax-fp32.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qs8_vmul_minmax_rndnu_test",
     srcs = [
         "qs8-vmul-minmax-rndnu.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qs8_vmulc_minmax_fp32_test",
     srcs = [
         "qs8-vmulc-minmax-fp32.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qs8_vmulc_minmax_rndnu_test",
     srcs = [
         "qs8-vmulc-minmax-rndnu.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -1901,51 +1924,43 @@ xnnpack_unit_test(
 xnnpack_unit_test(
     name = "qu8_dwconv_minmax_multipass_fp32_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qu8-dwconv-minmax-multipass-fp32.cc",
     ],
     shard_count = 10,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "qu8_dwconv_minmax_multipass_rndnu_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qu8-dwconv-minmax-multipass-rndnu.cc",
     ],
     shard_count = 10,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "qu8_dwconv_minmax_unipass_fp32_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qu8-dwconv-minmax-unipass-fp32.cc",
     ],
     shard_count = 5,
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
 xnnpack_unit_test(
     name = "qu8_dwconv_minmax_unipass_rndnu_test",
     srcs = [
-        "dwconv-microkernel-tester.h",
         "qu8-dwconv-minmax-unipass-rndnu.cc",
     ],
     deps = MICROKERNEL_TEST_DEPS + [
-        "//:microkernel_utils",
-        "//:packing_test_mode",
+        ":dwconv_microkernel_tester",
     ],
 )
 
@@ -1953,9 +1968,8 @@ xnnpack_unit_test(
     name = "qu8_f32_vcvt_test",
     srcs = [
         "qu8-f32-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -2038,27 +2052,24 @@ xnnpack_unit_test(
     name = "qu8_vadd_minmax_test",
     srcs = [
         "qu8-vadd-minmax.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qu8_vaddc_minmax_test",
     srcs = [
         "qu8-vaddc-minmax.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qu8_vcvt_test",
     srcs = [
         "qu8-vcvt.cc",
-        "vcvt-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vcvt_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -2083,36 +2094,32 @@ xnnpack_unit_test(
     name = "qu8_vmul_minmax_fp32_test",
     srcs = [
         "qu8-vmul-minmax-fp32.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qu8_vmul_minmax_rndnu_test",
     srcs = [
         "qu8-vmul-minmax-rndnu.cc",
-        "vbinary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qu8_vmulc_minmax_fp32_test",
     srcs = [
         "qu8-vmulc-minmax-fp32.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "qu8_vmulc_minmax_rndnu_test",
     srcs = [
         "qu8-vmulc-minmax-rndnu.cc",
-        "vbinaryc-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vbinaryc_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -2218,9 +2225,8 @@ xnnpack_unit_test(
     name = "s8_vclamp_test",
     srcs = [
         "s8-vclamp.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -2263,18 +2269,16 @@ xnnpack_unit_test(
     name = "u8_vclamp_test",
     srcs = [
         "u8-vclamp.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
     name = "u64_u32_vsqrtshift_test",
     srcs = [
         "u64-u32-vsqrtshift.cc",
-        "vunary-microkernel-tester.h",
     ],
-    deps = MICROKERNEL_TEST_DEPS,
+    deps = MICROKERNEL_TEST_DEPS + [":vunary_microkernel_tester"],
 )
 
 xnnpack_unit_test(
@@ -2471,18 +2475,10 @@ xnnpack_unit_test(
     name = "abs_nc_test",
     srcs = [
         "abs-nc.cc",
-        "abs-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "abs_nc_eager_test",
-    srcs = [
-        "abs-nc-eager.cc",
-        "abs-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2490,10 +2486,9 @@ xnnpack_unit_test(
     timeout = "moderate",
     srcs = [
         "add-nd.cc",
-        "binary-elementwise-operator-tester.h",
     ],
     shard_count = 5,
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
@@ -2501,9 +2496,8 @@ xnnpack_unit_test(
     timeout = "moderate",
     srcs = [
         "add-nd-eager.cc",
-        "binary-elementwise-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
@@ -2512,9 +2506,7 @@ xnnpack_unit_test(
         "argmax-pooling-nhwc.cc",
         "argmax-pooling-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + [
-        "//:aligned_allocator",
-    ],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2524,54 +2516,38 @@ xnnpack_unit_test(
         "average-pooling-operator-tester.h",
     ],
     shard_count = 5,
-    deps = OPERATOR_TEST_DEPS + [
-        "//:aligned_allocator",
-    ],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "bankers_rounding_nc_test",
     srcs = [
         "bankers-rounding-nc.cc",
-        "bankers-rounding-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "bankers_rounding_nc_eager_test",
-    srcs = [
-        "bankers-rounding-nc-eager.cc",
-        "bankers-rounding-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "batch_matrix_multiply_nc_test",
+    timeout = "long",
     srcs = [
         "batch-matrix-multiply-nc.cc",
         "batch-matrix-multiply-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + ["//:aligned_allocator"],
+    shard_count = 2,
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "ceiling_nc_test",
     srcs = [
         "ceiling-nc.cc",
-        "ceiling-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "ceiling_nc_eager_test",
-    srcs = [
-        "ceiling-nc-eager.cc",
-        "ceiling-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2587,18 +2563,10 @@ xnnpack_unit_test(
     name = "clamp_nc_test",
     srcs = [
         "clamp-nc.cc",
-        "clamp-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "clamp_nc_eager_test",
-    srcs = [
-        "clamp-nc-eager.cc",
-        "clamp-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2623,10 +2591,12 @@ xnnpack_unit_test(
 
 xnnpack_unit_test(
     name = "convert_nc_test",
+    timeout = "moderate",
     srcs = [
         "convert-nc.cc",
         "convert-operator-tester.h",
     ],
+    shard_count = 5,
     deps = OPERATOR_TEST_DEPS,
 )
 
@@ -2636,7 +2606,7 @@ xnnpack_unit_test(
         "convert-nc-eager.cc",
         "convert-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + ["//:math"],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2649,7 +2619,6 @@ xnnpack_unit_test(
     shard_count = 10,
     deps = OPERATOR_TEST_DEPS + [
         ":convolution_test_helpers",
-        "//:aligned_allocator",
     ],
 )
 
@@ -2662,7 +2631,6 @@ xnnpack_unit_test(
     ],
     deps = OPERATOR_TEST_DEPS + [
         ":convolution_test_helpers",
-        "//:aligned_allocator",
     ],
 )
 
@@ -2689,12 +2657,12 @@ xnnpack_unit_test(
     timeout = "moderate",
     srcs = [
         "deconvolution-nhwc.cc",
+        "deconvolution-nhwc-qd8-f32-qc8w.cc",
         "deconvolution-operator-tester.h",
     ],
     shard_count = 10,
     deps = OPERATOR_TEST_DEPS + [
         ":convolution_test_helpers",
-        "//:aligned_allocator",
     ],
 )
 
@@ -2719,20 +2687,20 @@ xnnpack_unit_test(
 xnnpack_unit_test(
     name = "divide_nd_test",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "divide-nd.cc",
     ],
     shard_count = 5,
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "divide_nd_eager_test",
+    timeout = "moderate",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "divide-nd-eager.cc",
     ],
-    deps = OPERATOR_TEST_DEPS,
+    shard_count = 5,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
@@ -2741,25 +2709,17 @@ xnnpack_unit_test(
         "dynamic-fully-connected-nc.cc",
         "dynamic-fully-connected-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + ["//:aligned_allocator"],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "elu_nc_test",
     srcs = [
         "elu-nc.cc",
-        "elu-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "elu_nc_eager_test",
-    srcs = [
-        "elu-nc-eager.cc",
-        "elu-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2775,18 +2735,10 @@ xnnpack_unit_test(
     name = "floor_nc_test",
     srcs = [
         "floor-nc.cc",
-        "floor-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "floor_nc_eager_test",
-    srcs = [
-        "floor-nc-eager.cc",
-        "floor-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2795,7 +2747,7 @@ xnnpack_unit_test(
         "global-average-pooling-nwc.cc",
         "global-average-pooling-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + ["//:aligned_allocator"],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2804,7 +2756,7 @@ xnnpack_unit_test(
         "global-average-pooling-ncw.cc",
         "global-average-pooling-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + ["//:aligned_allocator"],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2814,43 +2766,27 @@ xnnpack_unit_test(
         "global-sum-pooling-operator-tester.h",
     ],
     shard_count = 10,
-    deps = OPERATOR_TEST_DEPS + ["//:aligned_allocator"],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "hardswish_nc_test",
     srcs = [
         "hardswish-nc.cc",
-        "hardswish-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "hardswish_nc_eager_test",
-    srcs = [
-        "hardswish-nc-eager.cc",
-        "hardswish-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "leaky_relu_nc_test",
     srcs = [
         "leaky-relu-nc.cc",
-        "leaky-relu-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "leaky_relu_nc_eager_test",
-    srcs = [
-        "leaky-relu-nc-eager.cc",
-        "leaky-relu-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2867,20 +2803,18 @@ xnnpack_unit_test(
 xnnpack_unit_test(
     name = "maximum_nd_test",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "maximum-nd.cc",
     ],
     shard_count = 5,
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "maximum_nd_eager_test",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "maximum-nd-eager.cc",
     ],
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
@@ -2890,67 +2824,53 @@ xnnpack_unit_test(
         "mean-nd.cc",
         "mean-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + [
-        "//:aligned_allocator",
-    ],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "minimum_nd_test",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "minimum-nd.cc",
     ],
     shard_count = 5,
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "minimum_nd_eager_test",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "minimum-nd-eager.cc",
     ],
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "multiply_nd_test",
     timeout = "moderate",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "multiply-nd.cc",
     ],
     shard_count = 5,
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "multiply_nd_eager_test",
     timeout = "moderate",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "multiply-nd-eager.cc",
     ],
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "negate_nc_test",
     srcs = [
         "negate-nc.cc",
-        "negate-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "negate_nc_eager_test",
-    srcs = [
-        "negate-nc-eager.cc",
-        "negate-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -2990,14 +2910,22 @@ xnnpack_unit_test(
 )
 
 xnnpack_unit_test(
+    name = "reciprocal_square_root_nc_test",
+    srcs = [
+        "reciprocal-square-root-nc.cc",
+    ],
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
+    ],
+)
+
+xnnpack_unit_test(
     name = "resize_bilinear_nhwc_test",
     srcs = [
         "resize-bilinear-nhwc.cc",
         "resize-bilinear-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + [
-        "//:aligned_allocator",
-    ],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -3006,9 +2934,7 @@ xnnpack_unit_test(
         "resize-bilinear-nchw.cc",
         "resize-bilinear-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + [
-        "//:aligned_allocator",
-    ],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -3027,27 +2953,17 @@ xnnpack_unit_test(
         "scaled-dot-product-attention-nhtc.cc",
         "scaled-dot-product-attention-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS + [
-        "//:aligned_allocator",
-    ],
+    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "sigmoid_nc_test",
     srcs = [
         "sigmoid-nc.cc",
-        "sigmoid-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "sigmoid_nc_eager_test",
-    srcs = [
-        "sigmoid-nc-eager.cc",
-        "sigmoid-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -3093,93 +3009,66 @@ xnnpack_unit_test(
     name = "square_nc_test",
     srcs = [
         "square-nc.cc",
-        "square-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "square_nc_eager_test",
-    srcs = [
-        "square-nc-eager.cc",
-        "square-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "square_root_nc_test",
     srcs = [
         "square-root-nc.cc",
-        "square-root-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "square_root_nc_eager_test",
-    srcs = [
-        "square-root-nc-eager.cc",
-        "square-root-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
     name = "squared_difference_nd_test",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "squared-difference-nd.cc",
     ],
     shard_count = 5,
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "squared_difference_nd_eager_test",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "squared-difference-nd-eager.cc",
     ],
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "subtract_nd_test",
+    timeout = "moderate",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "subtract-nd.cc",
     ],
     shard_count = 10,
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "subtract_nd_eager_test",
     srcs = [
-        "binary-elementwise-operator-tester.h",
         "subtract-nd-eager.cc",
     ],
     shard_count = 5,
-    deps = OPERATOR_TEST_DEPS,
+    deps = OPERATOR_TEST_DEPS + [":binary_elementwise_operator_tester"],
 )
 
 xnnpack_unit_test(
     name = "tanh_nc_test",
     srcs = [
         "tanh-nc.cc",
-        "tanh-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "tanh_nc_eager_test",
-    srcs = [
-        "tanh-nc-eager.cc",
-        "tanh-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -3206,18 +3095,10 @@ xnnpack_unit_test(
     name = "truncation_nc_test",
     srcs = [
         "truncation-nc.cc",
-        "truncation-operator-tester.h",
     ],
-    deps = OPERATOR_TEST_DEPS,
-)
-
-xnnpack_unit_test(
-    name = "truncation_nc_eager_test",
-    srcs = [
-        "truncation-nc-eager.cc",
-        "truncation-operator-tester.h",
+    deps = OPERATOR_TEST_DEPS + [
+        ":unary_operator_tester",
     ],
-    deps = OPERATOR_TEST_DEPS,
 )
 
 xnnpack_unit_test(
@@ -3252,6 +3133,7 @@ xnnpack_cc_library(
         "subgraph-unary-tester.h",
     ],
     deps = [
+        ":replicable_random_device",
         "//:node_type",
         "//:operators_test_mode",
         "//:requantization",
@@ -3268,6 +3150,7 @@ xnnpack_cc_library(
         "subgraph-binary-tester.h",
     ],
     deps = [
+        ":replicable_random_device",
         "//:node_type",
         "//:operators_test_mode",
         "//:requantization",
@@ -3283,7 +3166,9 @@ xnnpack_unit_test(
         "workspace.cc",
     ],
     deps = [
+        ":replicable_random_device",
         "//:XNNPACK_test_mode",
+        "//:allocation_type",
         "//:math",
         "//:subgraph_test_mode",
     ],
@@ -3295,10 +3180,8 @@ xnnpack_unit_test(
         "abs-reshape.cc",
     ],
     deps = [
-        ":subgraph_unary_tester",
         "//:XNNPACK_test_mode",
         "//:node_type",
-        "//:operators_test_mode",
         "//:subgraph_test_mode",
     ],
 )
@@ -3310,6 +3193,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3324,9 +3208,11 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_binary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
+        "//:requantization",
         "//:subgraph_test_mode",
     ],
 )
@@ -3337,10 +3223,8 @@ xnnpack_unit_test(
         "add2-reshape.cc",
     ],
     deps = [
-        ":subgraph_unary_tester",
         "//:XNNPACK_test_mode",
         "//:node_type",
-        "//:operators_test_mode",
         "//:subgraph_test_mode",
     ],
 )
@@ -3351,6 +3235,7 @@ xnnpack_unit_test(
         "argmax-pooling-2d.cc",
     ],
     deps = [
+        ":replicable_random_device",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
         "//:common",
@@ -3366,6 +3251,8 @@ xnnpack_unit_test(
         "average-pooling-2d.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
         "//:common",
@@ -3383,11 +3270,7 @@ xnnpack_unit_test(
     ],
     deps = [
         "//:XNNPACK_test_mode",
-        "//:aligned_allocator",
-        "//:common",
         "//:node_type",
-        "//:operator_utils",
-        "//:operators_test_mode",
         "//:subgraph_test_mode",
     ],
 )
@@ -3399,6 +3282,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3412,9 +3296,12 @@ xnnpack_unit_test(
         "batch-matrix-multiply.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
         "//:common",
+        "//:node_type",
         "//:operators_test_mode",
         "//:subgraph_test_mode",
     ],
@@ -3427,6 +3314,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3441,6 +3329,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3454,6 +3343,8 @@ xnnpack_unit_test(
         "concatenate2.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3467,6 +3358,8 @@ xnnpack_unit_test(
         "concatenate3.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3480,6 +3373,8 @@ xnnpack_unit_test(
         "concatenate4.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3493,6 +3388,8 @@ xnnpack_unit_test(
         "concatenate5.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3507,6 +3404,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3521,8 +3419,12 @@ xnnpack_unit_test(
     ],
     deps = [
         ":convolution_test_helpers",
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
+        "//:common",
+        "//:node_type",
         "//:operator_utils",
         "//:operators_test_mode",
         "//:requantization",
@@ -3537,6 +3439,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3552,7 +3455,10 @@ xnnpack_unit_test(
     ],
     shard_count = 5,
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
+        "//:node_type",
         "//:operator_utils",
         "//:operators_test_mode",
         "//:requantization",
@@ -3566,6 +3472,8 @@ xnnpack_unit_test(
         "depth-to-space-2d.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3580,8 +3488,12 @@ xnnpack_unit_test(
     ],
     deps = [
         ":convolution_test_helpers",
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
+        "//:common",
+        "//:node_type",
         "//:operator_utils",
         "//:operators_test_mode",
         "//:requantization",
@@ -3596,6 +3508,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_binary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3610,6 +3523,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3623,6 +3537,8 @@ xnnpack_unit_test(
         "even-split2.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3636,6 +3552,8 @@ xnnpack_unit_test(
         "even-split3.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3649,6 +3567,8 @@ xnnpack_unit_test(
         "even-split4.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3663,6 +3583,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3676,10 +3597,12 @@ xnnpack_unit_test(
         "fully-connected.cc",
     ],
     deps = [
+        ":replicable_random_device",
         "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
         "//:common",
+        "//:math",
         "//:node_type",
         "//:operators_test_mode",
         "//:requantization",
@@ -3693,8 +3616,11 @@ xnnpack_unit_test(
         "global-average-pooling-1d.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
+        "//:common",
         "//:node_type",
         "//:operators_test_mode",
         "//:requantization",
@@ -3708,8 +3634,11 @@ xnnpack_unit_test(
         "global-average-pooling-2d.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
+        "//:common",
         "//:node_type",
         "//:operators_test_mode",
         "//:requantization",
@@ -3723,8 +3652,11 @@ xnnpack_unit_test(
         "global-sum-pooling-1d.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
+        "//:common",
         "//:node_type",
         "//:operators_test_mode",
         "//:subgraph_test_mode",
@@ -3737,8 +3669,11 @@ xnnpack_unit_test(
         "global-sum-pooling-2d.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
+        "//:common",
         "//:node_type",
         "//:operators_test_mode",
         "//:subgraph_test_mode",
@@ -3751,7 +3686,9 @@ xnnpack_unit_test(
         "hardswish.cc",
     ],
     deps = [
+        ":replicable_random_device",
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3766,6 +3703,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3779,6 +3717,8 @@ xnnpack_unit_test(
         "max-pooling-2d.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operator_utils",
@@ -3823,9 +3763,11 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_binary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
+        "//:requantization",
         "//:subgraph_test_mode",
     ],
 )
@@ -3837,6 +3779,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3850,6 +3793,23 @@ xnnpack_unit_test(
         "prelu.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
+        "//:XNNPACK_test_mode",
+        "//:node_type",
+        "//:operators_test_mode",
+        "//:subgraph_test_mode",
+    ],
+)
+
+xnnpack_unit_test(
+    name = "reciprocal_square_root_test",
+    srcs = [
+        "reciprocal-square-root.cc",
+    ],
+    deps = [
+        ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3863,10 +3823,11 @@ xnnpack_unit_test(
         "rope.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
-        "//:requantization",
         "//:subgraph_test_mode",
     ],
 )
@@ -3877,11 +3838,12 @@ xnnpack_unit_test(
         "scaled-dot-product-attention.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
         "//:common",
         "//:node_type",
-        "//:operators_test_mode",
         "//:subgraph_test_mode",
     ],
 )
@@ -3893,6 +3855,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3907,6 +3870,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3921,6 +3885,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3935,6 +3900,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3949,6 +3915,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3963,6 +3930,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_binary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -3976,11 +3944,14 @@ xnnpack_unit_test(
         "static-constant-pad.cc",
     ],
     deps = [
+        ":replicable_random_device",
         ":subgraph_unary_tester",
         "@FP16",
         "//:XNNPACK_test_mode",
+        "//:math",
         "//:node_type",
         "//:operators_test_mode",
+        "//:requantization",
         "//:subgraph_test_mode",
     ],
 )
@@ -3991,6 +3962,8 @@ xnnpack_unit_test(
         "static-mean.cc",
     ],
     deps = [
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:aligned_allocator",
         "//:common",
@@ -4006,10 +3979,24 @@ xnnpack_unit_test(
         "static-reshape.cc",
     ],
     deps = [
+        ":replicable_random_device",
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
+        "//:subgraph_test_mode",
+    ],
+)
+
+xnnpack_unit_test(
+    name = "reshape_helpers_test",
+    srcs = [
+        "reshape-helpers.cc",
+    ],
+    deps = [
+        ":replicable_random_device",
+        "//:XNNPACK_test_mode",
         "//:subgraph_test_mode",
     ],
 )
@@ -4034,7 +4021,8 @@ xnnpack_unit_test(
         "static-resize-bilinear-2d.cc",
     ],
     deps = [
-        ":subgraph_unary_tester",
+        ":replicable_random_device",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -4048,7 +4036,9 @@ xnnpack_unit_test(
         "static-slice.cc",
     ],
     deps = [
+        ":replicable_random_device",
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -4063,6 +4053,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -4077,9 +4068,11 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_binary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
+        "//:requantization",
         "//:subgraph_test_mode",
     ],
 )
@@ -4091,6 +4084,7 @@ xnnpack_unit_test(
     ],
     deps = [
         ":subgraph_unary_tester",
+        "@FP16",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operators_test_mode",
@@ -4104,10 +4098,8 @@ xnnpack_unit_test(
         "transpose-reshape.cc",
     ],
     deps = [
-        ":subgraph_unary_tester",
         "//:XNNPACK_test_mode",
         "//:node_type",
-        "//:operators_test_mode",
         "//:subgraph_test_mode",
     ],
 )
@@ -4118,11 +4110,11 @@ xnnpack_unit_test(
         "unpooling-2d.cc",
     ],
     deps = [
+        ":replicable_random_device",
         "//:XNNPACK_test_mode",
         "//:node_type",
         "//:operator_utils",
         "//:operators_test_mode",
-        "//:requantization",
         "//:subgraph_test_mode",
     ],
 )
@@ -4135,7 +4127,9 @@ xnnpack_unit_test(
         "subgraph-tester.h",
     ],
     deps = [
+        ":replicable_random_device",
         "//:XNNPACK_test_mode",
+        "//:node_type",
         "//:subgraph_test_mode",
     ],
 )
@@ -4150,6 +4144,7 @@ xnnpack_unit_test(
         "subgraph-tester.h",
     ],
     deps = [
+        ":replicable_random_device",
         "//:XNNPACK_test_mode",
         "//:subgraph_test_mode",
     ],
@@ -4163,19 +4158,7 @@ xnnpack_unit_test(
         "subgraph-tester.h",
     ],
     deps = [
-        "//:XNNPACK_test_mode",
-        "//:subgraph_test_mode",
-    ],
-)
-
-xnnpack_unit_test(
-    name = "subgraph_shape_inference_test",
-    srcs = [
-        "runtime-tester.h",
-        "subgraph-shape-inference.cc",
-        "subgraph-tester.h",
-    ],
-    deps = [
+        ":replicable_random_device",
         "//:XNNPACK_test_mode",
         "//:subgraph_test_mode",
     ],
@@ -4189,9 +4172,8 @@ xnnpack_unit_test(
         "subgraph-tester.h",
     ],
     deps = [
+        ":replicable_random_device",
         "//:XNNPACK_test_mode",
-        "//:common",
-        "//:math",
         "//:node_type",
         "//:subgraph_test_mode",
     ],
@@ -4204,6 +4186,7 @@ xnnpack_unit_test(
         "subgraph-tester.h",
     ],
     deps = [
+        ":replicable_random_device",
         "//:XNNPACK_test_mode",
         "//:subgraph_test_mode",
     ],
@@ -4218,10 +4201,13 @@ xnnpack_unit_test(
         "subgraph-tester.h",
     ],
     deps = [
+        ":replicable_random_device",
         "@FP16",
         "//:XNNPACK_test_mode",
+        "//:allocation_type",
         "//:allocator",
         "//:node_type",
+        "//:params",
         "//:subgraph_test_mode",
     ],
 )
@@ -4235,6 +4221,7 @@ xnnpack_unit_test(
         "//:common",
         "//:jit_test_mode",
         "//:memory",
+        "//:xnnpack_h",
     ],
 )
 
@@ -4245,11 +4232,13 @@ xnnpack_unit_test(
         "assembler-helpers.h",
     ],
     deps = [
+        ":replicable_random_device",
         "//:common",
         "//:jit_test_mode",
         "//:memory",
         "//:microparams",
         "//:microparams_init",
+        "//:xnnpack_h",
     ],
 )
 
@@ -4260,11 +4249,13 @@ xnnpack_unit_test(
         "assembler-helpers.h",
     ],
     deps = [
+        ":replicable_random_device",
         "//:common",
         "//:jit_test_mode",
         "//:memory",
         "//:microparams",
         "//:microparams_init",
+        "//:xnnpack_h",
     ],
 )
 
@@ -4296,6 +4287,7 @@ xnnpack_unit_test(
         "//:XNNPACK_test_mode",
         "//:cache",
         "//:common",
+        "//:memory",
     ],
 )
 
@@ -4303,6 +4295,7 @@ xnnpack_unit_test(
     name = "mutex_test",
     srcs = ["mutex.cc"],
     deps = [
+        ":replicable_random_device",
         "//:common",
         "//:mutex_test_mode",
         "//:xnnpack_h",
@@ -4312,20 +4305,14 @@ xnnpack_unit_test(
 xnnpack_unit_test(
     name = "microkernel_utils_test",
     srcs = ["microkernel-utils.cc"],
-    deps = [
-        "//:common",
-        "//:microkernel_utils",
-        "//:params",
-    ],
+    deps = ["//:microkernel_utils"],
 )
 
 xnnpack_unit_test(
     name = "operator_utils_test",
     srcs = ["operator-utils.cc"],
     deps = [
-        "//:common",
         "//:operator_utils",
-        "//:operators_test_mode",
         "//:params",
     ],
 )
@@ -4348,8 +4335,8 @@ xnnpack_unit_test(
         "indirection.cc",
     ],
     deps = [
-        "//:allocator",
         "//:indirection_test_mode",
+        "//:math",
         "//:operator_utils",
         "//:operators_test_mode",
         "//:xnnpack_h",

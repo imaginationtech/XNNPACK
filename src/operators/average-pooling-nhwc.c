@@ -7,6 +7,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <assert.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -14,22 +15,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <fp16/fp16.h>
-
 #include <xnnpack.h>
 #include <xnnpack/allocator.h>
-#include <xnnpack/config.h>
-#include <xnnpack/operator.h>
-#include <xnnpack/operator-type.h>
-#include <xnnpack/operator-utils.h>
 #include <xnnpack/common.h>
+#include <xnnpack/compute.h>
+#include <xnnpack/config.h>
+#include <xnnpack/indirection.h>
 #include <xnnpack/log.h>
 #include <xnnpack/math.h>
 #include <xnnpack/microkernel-type.h>
-#include <xnnpack/microparams-init.h>
+#include <xnnpack/operator-type.h>
+#include <xnnpack/operator-utils.h>
+#include <xnnpack/operator.h>
 #include <xnnpack/params.h>
-#include <xnnpack/indirection.h>
 
+#include <fp16/fp16.h>
+#include "pthreadpool.h"
 
 static inline size_t compute_output_dimension_with_tf_same_padding(
     size_t input_dimension,
@@ -481,7 +482,7 @@ static enum xnn_status reshape_average_pooling2d(
   average_pooling_op->input_pixel_stride = input_pixel_stride;
   average_pooling_op->output_pixel_stride = output_pixel_stride;
 
-  assert(!is_pixelwise || pavgpool != NULL && indirection_init_pavgpool2d != NULL);
+  assert(!is_pixelwise || (pavgpool != NULL && indirection_init_pavgpool2d != NULL));
 
   average_pooling_op->state = xnn_run_state_invalid;
 

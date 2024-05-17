@@ -4,17 +4,21 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <assert.h>
-#include <math.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include <xnnpack.h>
+#include <xnnpack/common.h>
 #include <xnnpack/log.h>
+#include <xnnpack/math.h>
+#include <xnnpack/node-type.h>
+#include <xnnpack/operator-type.h>
 #include <xnnpack/operator.h>
-#include <xnnpack/params.h>
-#include <xnnpack/subgraph.h>
 #include <xnnpack/subgraph-validation.h>
+#include <xnnpack/subgraph.h>
 
+#include "pthreadpool.h"
 
 static enum xnn_status create_resize_bilinear_operator(
   const struct xnn_node* node,
@@ -192,6 +196,7 @@ static enum xnn_status reshape_resize_bilinear_operator(
   const uint32_t output_id = opdata->outputs[0];
   assert(output_id < num_values);
   struct xnn_value* output_value = values + output_id;
+  output_value->shape.num_dims = 4;
   output_value->shape.dim[0] = batch_size;
   output_value->shape.dim[1] = output_height;
   output_value->shape.dim[2] = output_width;
@@ -332,6 +337,7 @@ enum xnn_status xnn_define_static_resize_bilinear_2d(
   }
 
   switch (input_value->datatype) {
+    case xnn_datatype_fp16:
     case xnn_datatype_fp32:
     case xnn_datatype_qint8:
     case xnn_datatype_quint8:
@@ -357,6 +363,9 @@ enum xnn_status xnn_define_static_resize_bilinear_2d(
 
   enum xnn_compute_type compute_type = xnn_compute_type_invalid;
   switch (output_value->datatype) {
+    case xnn_datatype_fp16:
+      compute_type = xnn_compute_type_fp16;
+      break;
     case xnn_datatype_fp32:
       compute_type = xnn_compute_type_fp32;
       break;

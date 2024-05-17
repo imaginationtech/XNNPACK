@@ -3,7 +3,6 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include <math.h>
 #include <stdlib.h>
 
 #include <xnnpack.h>
@@ -139,9 +138,7 @@ int main(int argc, char** argv) {
     case 21:
       xnn_create_max_pooling2d_nhwc_f32(
         0, 0, 0, 0,
-        0, 0,
-        0, 0,
-        0, 0,
+        0, 0, 0,
         0, 0, 0,
         0.0f, 0.0f,
         0, &op);
@@ -177,7 +174,7 @@ int main(int argc, char** argv) {
       break;
     case 29:
       xnn_create_prelu_nc_f32(
-        0, 0, 0,
+        0, 0, 0, 0,
         NULL, 0, NULL, NULL, &op);
       break;
     case 30:

@@ -4,20 +4,23 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <assert.h>
-#include <math.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
 #include <xnnpack.h>
+#include <xnnpack/common.h>
 #include <xnnpack/log.h>
+#include <xnnpack/node-type.h>
+#include <xnnpack/operator-type.h>
 #include <xnnpack/operator.h>
-#include <xnnpack/params.h>
 #include <xnnpack/requantization.h>
 #include <xnnpack/reshape-helpers.h>
-#include <xnnpack/subgraph.h>
 #include <xnnpack/subgraph-validation.h>
+#include <xnnpack/subgraph.h>
 
+#include "pthreadpool.h"
 
 static enum xnn_status create_add_operator(
   const struct xnn_node* node,
@@ -130,6 +133,16 @@ static enum xnn_status reshape_add_operator(
     memcpy(opdata->shape2.dim, values[input2_id].shape.dim, values[input2_id].shape.num_dims * sizeof(size_t));
   }
 
+  // Handle scalars. Although the output shape is dimensionless, the reshape
+  // function must be passed a valid shape to prevent skipping the op.
+  if (opdata->shape1.num_dims == 0) {
+    opdata->shape1.num_dims = 1;
+    opdata->shape1.dim[0] = 1;
+  }
+  if (opdata->shape2.num_dims == 0) {
+    opdata->shape2.num_dims = 1;
+    opdata->shape2.dim[0] = 1;
+  }
   const size_t old_workspace_size = opdata->workspace_size;
   enum xnn_status status = xnn_status_invalid_state;
   switch (opdata->operator_objects[0]->type) {
@@ -262,6 +275,7 @@ enum xnn_status xnn_define_add2(
 
   switch (input1_value->datatype) {
     case xnn_datatype_fp32:
+    case xnn_datatype_fp16:
     case xnn_datatype_qint8:
     case xnn_datatype_quint8:
       break;
@@ -286,6 +300,7 @@ enum xnn_status xnn_define_add2(
 
   switch (input2_value->datatype) {
     case xnn_datatype_fp32:
+    case xnn_datatype_fp16:
     case xnn_datatype_qint8:
     case xnn_datatype_quint8:
       break;
@@ -312,6 +327,9 @@ enum xnn_status xnn_define_add2(
   switch (output_value->datatype) {
     case xnn_datatype_fp32:
       compute_type = xnn_compute_type_fp32;
+      break;
+    case xnn_datatype_fp16:
+      compute_type = xnn_compute_type_fp16;
       break;
     case xnn_datatype_qint8:
       compute_type = xnn_compute_type_qs8;

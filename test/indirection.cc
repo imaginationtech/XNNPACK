@@ -3,17 +3,18 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <xnnpack.h>
+#include <xnnpack/indirection.h>
+#include <xnnpack/math.h>
+#include <xnnpack/operator-utils.h>
+#include <xnnpack/operator.h>
+
 #include <cstddef>
+#include <cstdint>
 #include <numeric>
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include <xnnpack.h>
-#include <xnnpack/allocator.h>
-#include <xnnpack/indirection.h>
-#include <xnnpack/operator-utils.h>
-#include <xnnpack/operator.h>
 
 namespace xnnpack {
 namespace {
@@ -119,7 +120,7 @@ class IndirectionTester {
         kernel_size + (output_width - 1) * step_width * kernel_height_;
 
     input_ = std::vector<float>(channels_ * input_height_ * input_width_);
-    std::iota(input_.begin(), input_.end(), 0);
+    std::iota(input_.begin(), input_.end(), 0.0f);
     zero_buffer_ = std::vector<float>(channels_);
 
     const size_t num_indirection_elements = (primary_tile_ - kernel_size) + output_height * step_height;

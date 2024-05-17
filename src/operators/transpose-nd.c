@@ -4,7 +4,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <assert.h>
-#include <math.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -12,11 +12,17 @@
 
 #include <xnnpack.h>
 #include <xnnpack/allocator.h>
+#include <xnnpack/common.h>
+#include <xnnpack/compute.h>
 #include <xnnpack/config.h>
 #include <xnnpack/log.h>
-#include <xnnpack/math.h>
+#include <xnnpack/microkernel-type.h>
 #include <xnnpack/normalization.h>
+#include <xnnpack/operator-type.h>
 #include <xnnpack/operator.h>
+#include <xnnpack/params.h>
+
+#include "pthreadpool.h"
 
 /// Reorder the data in array using the indices in loop_order.
 ///
@@ -167,8 +173,8 @@ static enum xnn_status reshape_transpose_nd(
     for (size_t j = i + 1; j < num_dims; ++j) {
       if (perm[i] == perm[j]) {
         xnn_log_error(
-            "failed to create %s operator with duplicate entries in perm",
-            xnn_operator_type_to_string(transpose_op->type));
+            "failed to create %s operator with duplicate entries in perm %zu %zu",
+            xnn_operator_type_to_string(transpose_op->type), perm[i], perm[j]);
         goto error;
       }
     }

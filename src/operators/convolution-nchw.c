@@ -4,6 +4,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <assert.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -11,22 +12,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <fp16/fp16.h>
-
 #include <xnnpack.h>
 #include <xnnpack/allocator.h>
+#include <xnnpack/cache.h>
 #include <xnnpack/common.h>
 #include <xnnpack/compute.h>
 #include <xnnpack/config.h>
-#include <xnnpack/indirection.h>
 #include <xnnpack/log.h>
 #include <xnnpack/math.h>
-#include <xnnpack/operator.h>
-#include <xnnpack/operator-utils.h>
+#include <xnnpack/microfnptr.h>
+#include <xnnpack/microkernel-type.h>
 #include <xnnpack/operator-type.h>
+#include <xnnpack/operator-utils.h>
+#include <xnnpack/operator.h>
 #include <xnnpack/pack.h>
-#include <xnnpack/microparams-init.h>
 #include <xnnpack/params.h>
+
+#include "pthreadpool.h"
+#include <fp16/fp16.h>
 
 static enum xnn_status create_spmm_path(
     const uint32_t kernel_height,
@@ -985,12 +988,6 @@ static enum xnn_status reshape_convolution2d_nchw(
     return xnn_status_success;
   }
 
-  if (convolution_op->weights_cache != NULL && !xnn_weights_cache_is_finalized(convolution_op->weights_cache)) {
-    xnn_log_error("failed to reshape %s operator: weights cache is not finalized",
-      xnn_operator_type_to_string(convolution_op->type));
-    return xnn_status_invalid_state;
-  }
-
   convolution_op->batch_size = batch_size;
   convolution_op->input_height = input_height;
   convolution_op->input_width = input_width;
@@ -1236,6 +1233,12 @@ static enum xnn_status setup_convolution2d_nchw(
       xnn_operator_type_to_string(expected_operator_type),
       xnn_operator_type_to_string(convolution_op->type));
     return xnn_status_invalid_parameter;
+  }
+
+  if (convolution_op->weights_cache != NULL && !xnn_weights_cache_is_finalized(convolution_op->weights_cache)) {
+    xnn_log_error("failed to setup %s operator: weights cache is not finalized",
+      xnn_operator_type_to_string(expected_operator_type));
+    return xnn_status_invalid_state;
   }
 
   switch (convolution_op->state) {

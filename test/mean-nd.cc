@@ -3,11 +3,16 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include <gtest/gtest.h>
+#include <xnnpack.h>
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 #include "mean-operator-tester.h"
-
-#include "xnnpack/normalization.h"
+#include <gtest/gtest.h>
 
 constexpr size_t kDim1 = 2;
 constexpr size_t kDim2 = 3;
@@ -77,19 +82,6 @@ TEST(MEAN_ND_F16, reduce_3d) {
       reduction_axes.push_back(2);
     }
 
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
-    }
-
     MeanOperatorTester()
       .input_shape(input_shape)
       .reduction_axes(reduction_axes)
@@ -118,19 +110,6 @@ TEST(MEAN_ND_F16, reduce_4d) {
     }
     if (reduce_dim4) {
       reduction_axes.push_back(3);
-    }
-
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
     }
 
     MeanOperatorTester()
@@ -165,19 +144,6 @@ TEST(MEAN_ND_F16, reduce_5d) {
     }
     if (reduce_dim5) {
       reduction_axes.push_back(4);
-    }
-
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
     }
 
     MeanOperatorTester()
@@ -218,19 +184,6 @@ TEST(MEAN_ND_F16, reduce_6d) {
       reduction_axes.push_back(5);
     }
 
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
-    }
-
     MeanOperatorTester()
       .input_shape(input_shape)
       .reduction_axes(reduction_axes)
@@ -269,19 +222,6 @@ TEST(MEAN_ND_F16, reduce_6d_multithreaded) {
       reduction_axes.push_back(5);
     }
 
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
-    }
-
     MeanOperatorTester()
       .input_shape(input_shape)
       .reduction_axes(reduction_axes)
@@ -306,8 +246,15 @@ TEST(MEAN_ND_F32, reduce_first_axis) {
 
 TEST(MEAN_ND_F32, reduce_last_axis) {
   MeanOperatorTester()
-    .input_shape({kDim1, kDim2})
-    .reduction_axes({1})
+    .input_shape({kDim1, kDim2, kDim3})
+    .reduction_axes({0,2})
+    .TestF32();
+}
+
+TEST(MEAN_ND_F32, reduce_last_axis2) {
+  MeanOperatorTester()
+    .input_shape({kDim1, kDim2, kDim3})
+    .reduction_axes({0,2})
     .TestF32();
 }
 
@@ -350,19 +297,6 @@ TEST(MEAN_ND_F32, reduce_3d) {
       reduction_axes.push_back(2);
     }
 
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
-    }
-
     MeanOperatorTester()
       .input_shape(input_shape)
       .reduction_axes(reduction_axes)
@@ -391,19 +325,6 @@ TEST(MEAN_ND_F32, reduce_4d) {
     }
     if (reduce_dim4) {
       reduction_axes.push_back(3);
-    }
-
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
     }
 
     MeanOperatorTester()
@@ -438,19 +359,6 @@ TEST(MEAN_ND_F32, reduce_5d) {
     }
     if (reduce_dim5) {
       reduction_axes.push_back(4);
-    }
-
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
     }
 
     MeanOperatorTester()
@@ -491,19 +399,6 @@ TEST(MEAN_ND_F32, reduce_6d) {
       reduction_axes.push_back(5);
     }
 
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
-    }
-
     MeanOperatorTester()
       .input_shape(input_shape)
       .reduction_axes(reduction_axes)
@@ -540,19 +435,6 @@ TEST(MEAN_ND_F32, reduce_6d_multithreaded) {
     }
     if (reduce_dim6) {
       reduction_axes.push_back(5);
-    }
-
-    size_t num_normalized_input_dims = input_shape.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_input_shape;
-    std::copy(input_shape.cbegin(), input_shape.cend(), normalized_input_shape.begin());
-    size_t num_normalized_reduction_axes = reduction_axes.size();
-    std::array<size_t, XNN_MAX_TENSOR_DIMS> normalized_reduction_axes;
-    std::copy(reduction_axes.cbegin(), reduction_axes.cend(), normalized_reduction_axes.begin());
-    xnn_normalize_reduction(
-      &num_normalized_reduction_axes, normalized_reduction_axes.data(),
-      &num_normalized_input_dims, normalized_input_shape.data());
-    if (num_normalized_reduction_axes != 1) {
-      continue;  // unsupported reduction configuration, will fail if we proceed
     }
 
     MeanOperatorTester()

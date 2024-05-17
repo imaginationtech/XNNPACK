@@ -4,20 +4,21 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <assert.h>
-#include <math.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include <xnnpack.h>
+#include <xnnpack/common.h>
 #include <xnnpack/log.h>
-#include <xnnpack/operator.h>
+#include <xnnpack/node-type.h>
 #include <xnnpack/operator-type.h>
-#include <xnnpack/params.h>
+#include <xnnpack/operator.h>
 #include <xnnpack/reshape-helpers.h>
-#include <xnnpack/subgraph.h>
 #include <xnnpack/subgraph-validation.h>
+#include <xnnpack/subgraph.h>
 
-
+#include "pthreadpool.h"
 
 static enum xnn_status create_convert_operator(
   const struct xnn_node* node,
@@ -149,7 +150,7 @@ static enum xnn_status reshape_convert_operator(
        assert(output_id < num_values);
        const struct xnn_value* output_value = values + output_id;
        const size_t num_nonbatch_dims = output_value->quantization.num_nonbatch_dims;
-       const size_t dq_batch_size = xnn_shape_multiply_batch_dims(&values[output_id].shape, num_nonbatch_dims);
+       const size_t dq_batch_size = xnn_shape_multiply_batch_dims(&values[input_id].shape, num_nonbatch_dims);
        const size_t dq_channel_stride = xnn_shape_multiply_trailing_dims(&values[input_id].shape, num_input_dims - num_nonbatch_dims);
       status = xnn_reshape_convert_nc_f16_qd8(
         opdata->operator_objects[0],
@@ -164,7 +165,7 @@ static enum xnn_status reshape_convert_operator(
        assert(output_id < num_values);
        const struct xnn_value* output_value = values + output_id;
        const size_t num_nonbatch_dims = output_value->quantization.num_nonbatch_dims;
-       const size_t dq_batch_size = xnn_shape_multiply_batch_dims(&values[output_id].shape, num_nonbatch_dims);
+       const size_t dq_batch_size = xnn_shape_multiply_batch_dims(&values[input_id].shape, num_nonbatch_dims);
        const size_t dq_channel_stride = xnn_shape_multiply_trailing_dims(&values[input_id].shape, num_input_dims - num_nonbatch_dims);
       status = xnn_reshape_convert_nc_f32_qd8(
         opdata->operator_objects[0],
@@ -362,6 +363,8 @@ static inline enum xnn_compute_type validate_datatypes(
       break;
     case xnn_datatype_qint8:
       switch (output_datatype) {
+        case xnn_datatype_fp16:
+          return xnn_compute_type_qs8_to_fp16;
         case xnn_datatype_fp32:
           return xnn_compute_type_qs8_to_fp32;
         case xnn_datatype_qint8:
@@ -449,11 +452,6 @@ enum xnn_status xnn_define_convert(
 
   const struct xnn_value* output_value = &subgraph->values[output_id];
   status = xnn_subgraph_check_output_type_dense(xnn_node_type_convert, output_id, output_value);
-  if (status != xnn_status_success) {
-    return status;
-  }
-
-  status = xnn_subgraph_check_all_dims_match(xnn_node_type_convert, input_id, input_value, output_id, output_value);
   if (status != xnn_status_success) {
     return status;
   }
