@@ -1,12 +1,13 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Imagination Technologies, inc.
 //
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
+$assert LMUL in [1, 2, 4, 8]
+$assert DATATYPE in ["QS8", "QU8"]
 #include <assert.h>
 #include <riscv_vector.h>
 #include <xnnpack/vbinary.h>
-$assert DATATYPE in ["QS8", "QU8"]
 $XINT8_T = {"QS8": "int8_t", "QU8": "uint8_t"}[DATATYPE]
 $VSIZE1 = {1: "m1", 2: "m2"}[LMUL]
 $VSIZE2 = {1: "m2", 2: "m4"}[LMUL]
@@ -47,8 +48,7 @@ void xnn_${DATATYPE.lower()}_vaddc_minmax_ukernel__rvv_u${LMUL}v(
     vint32${VSIZE4}_t a_i32v = __riscv_vwcvt_x_x_v_i32${VSIZE4}(a_i16v, n);
     a_i32v = __riscv_vmul_vx_i32${VSIZE4}(a_i32v, a_multiplier, n);
     vint32${VSIZE4}_t out_i32v = __riscv_vadd_vx_i32${VSIZE4}(a_i32v, bias, n);
-    out_i32v = __riscv_vssra_vx_i32${VSIZE4}(out_i32v, shift, n);
-    vint16${VSIZE2}_t out_i16v = __riscv_vncvt_x_x_w_i16${VSIZE2}(out_i32v, n);
+    vint16${VSIZE2}_t out_i16v = __riscv_vnclip_wx_i16${VSIZE2}(out_i32v, shift, 0, n);
     out_i16v = __riscv_vadd_vx_i16${VSIZE2}(out_i16v, output_zero_point, n);
     out_i16v = __riscv_vmin_vx_i16${VSIZE2}(__riscv_vmax_vx_i16${VSIZE2}(out_i16v, output_min, n), output_max, n);
     $if DATATYPE == "QS8":

@@ -2,7 +2,7 @@
 //   Template: src/qs8-vaddc/rvv.c.in
 //   Generator: tools/xngen
 //
-// Copyright 2023 Google LLC
+// Copyright 2024 Imagination Technologies, inc.
 //
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
@@ -42,8 +42,7 @@ void xnn_qu8_vaddc_minmax_ukernel__rvv_u2v(
     vint32m8_t a_i32v = __riscv_vwcvt_x_x_v_i32m8(a_i16v, n);
     a_i32v = __riscv_vmul_vx_i32m8(a_i32v, a_multiplier, n);
     vint32m8_t out_i32v = __riscv_vadd_vx_i32m8(a_i32v, bias, n);
-    out_i32v = __riscv_vssra_vx_i32m8(out_i32v, shift, n);
-    vint16m4_t out_i16v = __riscv_vncvt_x_x_w_i16m4(out_i32v, n);
+    vint16m4_t out_i16v = __riscv_vnclip_wx_i16m4(out_i32v, shift, 0, n);
     out_i16v = __riscv_vadd_vx_i16m4(out_i16v, output_zero_point, n);
     out_i16v = __riscv_vmin_vx_i16m4(__riscv_vmax_vx_i16m4(out_i16v, output_min, n), output_max, n);
     a_u16v = __riscv_vreinterpret_v_i16m4_u16m4(out_i16v);
