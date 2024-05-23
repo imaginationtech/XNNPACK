@@ -1120,15 +1120,55 @@ size_t xnn_init_qs8_avgpool_minmax_fp32_sse4_params(
   for (uint32_t i = 0; i < 4; i++) {
     params->fp32_sse4.init_bias[i] = init_bias;
     params->fp32_sse4.scale[i] = scale;
+    params->fp32_sse4.magic_bias[i] = 12582912.0f;
+    params->fp32_sse4.magic_bias_less_output_zero_point[i] = INT32_C(0x4B400000) - (int32_t) output_zero_point;
     params->fp32_sse4.output_max_less_zero_point[i] = output_max_less_zero_point;
+    params->fp32_sse4.magic_bias_less_output_zero_point[i] = INT32_C(0x4B400000) - (int32_t) output_zero_point;
   }
   for (uint32_t i = 0; i < 8; i++) {
     params->fp32_sse4.output_zero_point[i] = (int16_t) output_zero_point;
   }
   for (uint32_t i = 0; i < 16; i++) {
     params->fp32_sse4.output_min[i] = output_min;
+    params->fp32_sse4.output_max[i] = output_max;
+  }
+  for (uint32_t i = 0; i < 7; i++) {
+    params->fp32_sse4.mask_table[i] = -1;
+  }
+  for (uint32_t i = 7; i < 14; i++) {
+    params->fp32_sse4.mask_table[i] = 0;
   }
   return sizeof(params->fp32_sse4);
+}
+
+size_t xnn_init_qs8_avgpool_minmax_fp32_avx2_params(
+  union xnn_qs8_avgpool_minmax_params params[XNN_MIN_ELEMENTS(1)],
+  int32_t init_bias,
+  float scale,
+  int8_t output_zero_point,
+  int8_t output_min,
+  int8_t output_max)
+{
+  assert(scale >= 0x1.0p-32f);
+  assert(scale < 256.0f);
+
+  for (uint32_t i = 0; i < 8; i++) {
+    params->fp32_avx2.init_bias[i] = init_bias;
+    params->fp32_avx2.scale[i] = scale;
+    params->fp32_avx2.magic_bias[i] = 12582912.0f;
+    params->fp32_avx2.magic_bias_less_output_zero_point[i] = INT32_C(0x4B400000) - (int32_t) output_zero_point;
+  }
+  for (uint32_t i = 0; i < 32; i++) {
+    params->fp32_avx2.output_min[i] = output_min;
+    params->fp32_avx2.output_max[i] = output_max;
+  }
+  for (uint32_t i = 0; i < 15; i++) {
+    params->fp32_avx2.mask_table[i] = -1;
+  }
+  for (uint32_t i = 15; i < 30; i++) {
+    params->fp32_avx2.mask_table[i] = 0;
+  }
+  return sizeof(params->fp32_avx2);
 }
 
 void xnn_update_qs8_avgpool_minmax_fp32_sse4_params(
@@ -1685,7 +1725,6 @@ void xnn_update_qu8_avgpool_minmax_fp32_wasmsimd_params(
 }
 #endif  // XNN_ARCH_WASMSIMD || XNN_ARCH_WASMRELAXEDSIMD
 
-#if XNN_ARCH_ARM || XNN_ARCH_ARM64
 size_t xnn_init_f16_scale_fp16arith_params(
   union xnn_f16_scale_params params[XNN_MIN_ELEMENTS(1)],
   uint16_t scale)
@@ -1693,7 +1732,6 @@ size_t xnn_init_f16_scale_fp16arith_params(
   params->fp16arith.scale = scale;
   return sizeof(params->fp16arith);
 }
-#endif  // XNN_ARCH_ARM || XNN_ARCH_ARM64
 
 size_t xnn_init_f16_f32acc_scale_scalar_params(
   union xnn_f16_f32acc_scale_params params[XNN_MIN_ELEMENTS(1)],
