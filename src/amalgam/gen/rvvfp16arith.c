@@ -6,10 +6,34 @@
 // Auto-generated file. Do not edit!
 //   Generator: tools/update-microkernels.py -a
 
-
+#include <assert.h>
 
 #include <riscv_vector.h>
 
+#include "xnnpack/vcvt.h"
 
 
+void xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u8v(
+   size_t batch,
+   const float* input,
+   void* output,
+   const union xnn_f32_f16_cvt_params params[restrict XNN_MIN_ELEMENTS(1)]) XNN_OOB_READS
+{
+  assert(batch != 0);
+  assert(batch % sizeof(float) == 0);
+  assert(input != NULL);
+  assert(output != NULL);
 
+  batch >>= XNN_LOG2_SIZEOF_FLOAT;
+
+  _Float16* o = (_Float16*) output;
+  for (; batch > 0;) {
+    const int32_t n = __riscv_vsetvl_e32m8(batch); batch -= n;
+    
+    vfloat32m8_t x_f32v = __riscv_vle32_v_f32m8(input, n); input += n;
+
+    vfloat16m4_t y_f16v = __riscv_vfncvt_f_f_w_f16m4(x_f32v, n);
+
+    __riscv_vse16_v_f16m4(o, y_f16v, n); o += n;
+  }
+}

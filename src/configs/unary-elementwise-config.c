@@ -1596,10 +1596,10 @@ static void init_f32_to_f16_cvt_config(void) {
     f32_to_f16_cvt_config.ukernel = (xnn_vunary_ukernel_fn) xnn_f32_f16_vcvt_ukernel__scalar_bitcast_u4;
     f32_to_f16_cvt_config.init.f32_f16_cvt = xnn_init_f32_f16_cvt_scalar_bitcast_params;
     f32_to_f16_cvt_config.element_tile = 4;
-  #elif XNN_ARCH_RISCV
-    f32_to_f16_cvt_config.ukernel = (xnn_vunary_ukernel_fn) xnn_f32_f16_vcvt_ukernel__scalar_fabsf_u2;
-    f32_to_f16_cvt_config.init.f32_f16_cvt = xnn_init_f32_f16_cvt_scalar_fabsf_params;
-    f32_to_f16_cvt_config.element_tile = 2;
+  #elif XNN_ARCH_RISCV && XNN_ENABLE_RISCV_FP16_VECTOR
+    const struct xnn_hardware_config* hardware_config = xnn_init_hardware_config();
+    f32_to_f16_cvt_config.ukernel = (xnn_vunary_ukernel_fn) xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u8v;
+    f32_to_f16_cvt_config.element_tile = hardware_config->vlenb/sizeof(float) * 8;
   #else
     f32_to_f16_cvt_config.ukernel = (xnn_vunary_ukernel_fn) xnn_f32_f16_vcvt_ukernel__scalar_fabsf_u2;
     f32_to_f16_cvt_config.init.f32_f16_cvt = xnn_init_f32_f16_cvt_scalar_fabsf_params;
