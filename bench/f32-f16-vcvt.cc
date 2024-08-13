@@ -286,6 +286,46 @@
 #endif  // XNN_ARCH_ARM || XNN_ARCH_ARM64
 
 
+#if XNN_ENABLE_RISCV_FP16_VECTOR && XNN_ARCH_RISCV
+  BENCHMARK_CAPTURE(f32_f16_vcvt, rvvfp16arith_u1v,
+                    xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u1v,
+                    nullptr /* init params */,
+                    benchmark::utils::CheckRVVFP16ARITH)
+    ->Apply(benchmark::utils::UnaryElementwiseParameters<float, uint16_t>)
+    ->UseRealTime();
+#endif  // XNN_ENABLE_RISCV_FP16_VECTOR && XNN_ARCH_RISCV
+
+
+#if XNN_ENABLE_RISCV_FP16_VECTOR && XNN_ARCH_RISCV
+  BENCHMARK_CAPTURE(f32_f16_vcvt, rvvfp16arith_u2v,
+                    xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u2v,
+                    nullptr /* init params */,
+                    benchmark::utils::CheckRVVFP16ARITH)
+    ->Apply(benchmark::utils::UnaryElementwiseParameters<float, uint16_t>)
+    ->UseRealTime();
+#endif  // XNN_ENABLE_RISCV_FP16_VECTOR && XNN_ARCH_RISCV
+
+
+#if XNN_ENABLE_RISCV_FP16_VECTOR && XNN_ARCH_RISCV
+  BENCHMARK_CAPTURE(f32_f16_vcvt, rvvfp16arith_u4v,
+                    xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u4v,
+                    nullptr /* init params */,
+                    benchmark::utils::CheckRVVFP16ARITH)
+    ->Apply(benchmark::utils::UnaryElementwiseParameters<float, uint16_t>)
+    ->UseRealTime();
+#endif  // XNN_ENABLE_RISCV_FP16_VECTOR && XNN_ARCH_RISCV
+
+
+#if XNN_ENABLE_RISCV_FP16_VECTOR && XNN_ARCH_RISCV
+  BENCHMARK_CAPTURE(f32_f16_vcvt, rvvfp16arith_u8v,
+                    xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u8v,
+                    nullptr /* init params */,
+                    benchmark::utils::CheckRVVFP16ARITH)
+    ->Apply(benchmark::utils::UnaryElementwiseParameters<float, uint16_t>)
+    ->UseRealTime();
+#endif  // XNN_ENABLE_RISCV_FP16_VECTOR && XNN_ARCH_RISCV
+
+
 #if XNN_ARCH_X86 || XNN_ARCH_X86_64
   BENCHMARK_CAPTURE(f32_f16_vcvt, f16c_u8,
                     xnn_f32_f16_vcvt_ukernel__f16c_u8,

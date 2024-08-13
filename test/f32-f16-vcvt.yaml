@@ -14,6 +14,11 @@
   init: xnn_init_f32_f16_cvt_neon_params
 - name: xnn_f32_f16_vcvt_ukernel__neonfp16_u8
 - name: xnn_f32_f16_vcvt_ukernel__neonfp16_u16
+# RISC-V Vector+FP16ARITH
+- name: xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u1v
+- name: xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u2v
+- name: xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u4v
+- name: xnn_f32_f16_vcvt_ukernel__rvvfp16arith_u8v
 # x86 SSE
 - name: xnn_f32_f16_vcvt_ukernel__sse2_u8
   init: xnn_init_f32_f16_cvt_sse2_params
