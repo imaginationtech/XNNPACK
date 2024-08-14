@@ -12,6 +12,11 @@
   init: xnn_init_qs8_f32_cvt_neon_params
 - name: xnn_qs8_f32_vcvt_ukernel__neon_u32
   init: xnn_init_qs8_f32_cvt_neon_params
+# RISC-V Vector
+- name: xnn_qs8_f32_vcvt_ukernel__rvv_u1v
+  init: xnn_init_qs8_f32_cvt_rvv_params
+- name: xnn_qs8_f32_vcvt_ukernel__rvv_u2v
+  init: xnn_init_qs8_f32_cvt_rvv_params
 # x86 SSE
 - name: xnn_qs8_f32_vcvt_ukernel__sse2_u8
   init: xnn_init_qs8_f32_cvt_sse2_params

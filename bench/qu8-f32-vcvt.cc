@@ -18,6 +18,26 @@
 #include "xnnpack/vcvt.h"
 
 
+#if XNN_ENABLE_RISCV_VECTOR && XNN_ARCH_RISCV
+  BENCHMARK_CAPTURE(qu8_f32_vcvt, rvv_u1v,
+                    xnn_qu8_f32_vcvt_ukernel__rvv_u1v,
+                    xnn_init_qu8_f32_cvt_rvv_params,
+                    benchmark::utils::CheckRVV)
+    ->Apply(benchmark::utils::UnaryElementwiseParameters<uint8_t, float>)
+    ->UseRealTime();
+#endif  // XNN_ENABLE_RISCV_VECTOR && XNN_ARCH_RISCV
+
+
+#if XNN_ENABLE_RISCV_VECTOR && XNN_ARCH_RISCV
+  BENCHMARK_CAPTURE(qu8_f32_vcvt, rvv_u2v,
+                    xnn_qu8_f32_vcvt_ukernel__rvv_u2v,
+                    xnn_init_qu8_f32_cvt_rvv_params,
+                    benchmark::utils::CheckRVV)
+    ->Apply(benchmark::utils::UnaryElementwiseParameters<uint8_t, float>)
+    ->UseRealTime();
+#endif  // XNN_ENABLE_RISCV_VECTOR && XNN_ARCH_RISCV
+
+
 #if XNN_ARCH_WASMSIMD || XNN_ARCH_WASMRELAXEDSIMD
   BENCHMARK_CAPTURE(qu8_f32_vcvt, wasmsimd_u8,
                     xnn_qu8_f32_vcvt_ukernel__wasmsimd_u8,
