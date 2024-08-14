@@ -3350,7 +3350,7 @@ IF(XNNPACK_BUILD_TESTS)
   TARGET_LINK_LIBRARIES(qu8-dwconv-minmax-unipass-rndnu-test PRIVATE dwconv-microkernel-tester hardware-config logging microkernels-all microparams-init packing)
   ADD_TEST(NAME qu8-dwconv-minmax-unipass-rndnu-test COMMAND qu8-dwconv-minmax-unipass-rndnu-test)
 
-  ADD_EXECUTABLE(qu8-f32-vcvt-test test/f32-f16-vcvt.cc)
+  ADD_EXECUTABLE(qu8-f32-vcvt-test test/qu8-f32-vcvt.cc)
   TARGET_INCLUDE_DIRECTORIES(qu8-f32-vcvt-test PRIVATE include src test)
   TARGET_LINK_LIBRARIES(qu8-f32-vcvt-test PRIVATE fp16 pthreadpool GTest::gtest GTest::gtest_main)
   TARGET_LINK_LIBRARIES(qu8-f32-vcvt-test PRIVATE vcvt-microkernel-tester hardware-config logging microkernels-all microparams-init)
