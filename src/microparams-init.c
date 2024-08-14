@@ -8024,6 +8024,18 @@ size_t xnn_init_qs8_f32_cvt_neon_params(
 }
 #endif  // XNN_ARCH_ARM || XNN_ARCH_ARM64
 
+#if XNN_ARCH_RISCV && XNN_ENABLE_RISCV_VECTOR
+size_t xnn_init_qs8_f32_cvt_rvv_params(
+  union xnn_qs8_f32_cvt_params params[XNN_MIN_ELEMENTS(1)],
+  float scale,
+  int8_t zero_point)
+{
+  params->rvv.minus_zero_point = -(int32_t) zero_point;
+  params->rvv.scale = scale;
+  return sizeof(params->rvv);
+}
+#endif  // XNN_ARCH_RISCV && XNN_ENABLE_RISCV_VECTOR
+
 #if XNN_ARCH_ARM || XNN_ARCH_ARM64
 size_t xnn_init_qs8_f16_cvt_neonfp16arith_params(
   union xnn_qs8_f16_cvt_params params[XNN_MIN_ELEMENTS(1)],
@@ -8290,6 +8302,19 @@ size_t xnn_init_qu8_f32_cvt_neon_params(
 }
 
 #endif  // XNN_ARCH_ARM || XNN_ARCH_ARM64
+
+#if XNN_ARCH_RISCV && XNN_ENABLE_RISCV_VECTOR
+size_t xnn_init_qu8_f32_cvt_rvv_params(
+  union xnn_qu8_f32_cvt_params params[XNN_MIN_ELEMENTS(1)],
+  float scale,
+  uint8_t zero_point)
+{
+  params->rvv.minus_zero_point = -(int32_t) zero_point;
+  params->rvv.scale = scale;
+  return sizeof(params->rvv);
+}
+
+#endif  // XNN_ARCH_RISCV && XNN_ENABLE_RISCV_VECTOR
 
 #if XNN_ARCH_X86 || XNN_ARCH_X86_64
 size_t xnn_init_qu8_f32_cvt_sse2_params(

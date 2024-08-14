@@ -1689,6 +1689,12 @@ union xnn_qs8_f32_cvt_params {
     float scale;
   } neon;
 #endif  // XNN_ARCH_ARM || XNN_ARCH_ARM64
+#if XNN_ARCH_RISCV && XNN_ENABLE_RISCV_VECTOR
+  struct {
+    int32_t minus_zero_point;
+    float scale;
+  } rvv;
+#endif  // XNN_ARCH_RISCV && XNN_ENABLE_RISCV_VECTOR
 #if XNN_ARCH_X86 || XNN_ARCH_X86_64
   struct {
     XNN_ALIGN(16) uint8_t sign_mask[16];
@@ -1770,6 +1776,12 @@ union xnn_qu8_f32_cvt_params {
     float scale;
   } neon;
 #endif  // XNN_ARCH_ARM || XNN_ARCH_ARM64
+#if XNN_ARCH_RISCV && XNN_ENABLE_RISCV_VECTOR
+  struct {
+    int32_t minus_zero_point;
+    float scale;
+  } rvv;
+#endif  // XNN_ARCH_RISCV && XNN_ENABLE_RISCV_VECTOR
 #if XNN_ARCH_X86 || XNN_ARCH_X86_64
   struct {
     XNN_ALIGN(16) uint16_t magic_exp[8];
